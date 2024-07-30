@@ -6,7 +6,6 @@ import string
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-import re
 
 
 regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
@@ -51,6 +50,7 @@ def reg(username: str, password: str, email: str):
     if user_exists(username):
         raise HTTPException(status_code=400, detail="Username already exists")
     else:
+        import re
         if re.fullmatch(regex, email):
             conn = get_db_connection()
             c = conn.cursor()
@@ -87,7 +87,10 @@ async def login(user: UserCreate, response: Response):
     hashed_password = hashlib.sha256(user.password.encode()).hexdigest()
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute('SELECT * FROM name_table WHERE username_db = ? AND password_db = ? AND email = ?', (user.username, hashed_password, user.email))
+    c.execute(
+        'SELECT * FROM name_table WHERE username_db = ? AND password_db = ? AND email = ?',
+        (user.username, hashed_password, user.email)
+    )
     user_row = c.fetchone()
     conn.close()
 
