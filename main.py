@@ -6,9 +6,11 @@ import string
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+import re
 
 
-regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
+email_sample = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
+
 
 app = FastAPI()
 
@@ -19,11 +21,11 @@ def get_db_connection():
     return conn
 
 
-def create_tables():
+def create_table1():
     conn = get_db_connection()
     c = conn.cursor()
     c.execute(
-        """CREATE TABLE IF NOT EXISTS name_table (
+        """CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username_db TEXT UNIQUE,
                     password_db TEXT,
@@ -34,32 +36,48 @@ def create_tables():
     conn.close()
 
 
-create_tables()
-
-
-def user_exists(username: str) -> bool:
+def create_table2():
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT 1 FROM name_table WHERE username_db = ?", (username,))
-    exists = c.fetchone() is not None
+    c.execute(
+        """CREATE TABLE IF NOT EXISTS meetings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username_db TEXT UNIQUE,
+                    password_db TEXT,
+                    email TEXT UNIQUE
+                )"""
+    )
+    conn.commit()
     conn.close()
-    return exists
+
+
+def user_exists(username: str, email: str) -> bool:
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(
+        'SELECT 1 FROM name_table WHERE username_db = ?'
+        , (username,)
+    )
+    exists1 = c.fetchone() is not None
+    if username in exists1: # тут пока ошибка не робит TypeError: argument of type 'bool' is not iterable
+        return True
+    c.execute(
+        'SELECT 1 FROM name_table WHERE email = ?'
+        , (email,)
+    )
+    exists = c.fetchone() is not None
+    if email in exists:
+        return True
+    conn.close()
+    if re.fullmatch(email_sample, email):
+        return False
 
 
 def reg(username: str, password: str, email: str):
-    if user_exists(username):
-        raise HTTPException(status_code=400, detail="Username already exists")
+    if user_exists(username, email):
+        raise HTTPException(status_code=400, detail="Username or email already exists")
     else:
-        import re
-        if re.fullmatch(regex, email):
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute('SELECT 1 FROM name_table WHERE email = ?', (email,))
-            email1 = c.fetchone() is not None
-            if email1:
-                raise HTTPException(status_code=400, detail="Email already exists")
-        else:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     conn = get_db_connection()
@@ -96,9 +114,8 @@ async def login(user: UserCreate, response: Response):
 
     if user_row:
         session_token = generate_session_token(10)
-        response.set_cookie(
-            key="session_token", value=session_token, secure=True, httponly=True
-        )
+        response.set_cookie(key="session_token", value=session_token, secure=True, httponly=True)
+        return response
         return JSONResponse(content={"message": "Login successful"})
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -108,6 +125,9 @@ async def login(user: UserCreate, response: Response):
 async def register(user: UserCreate):
     reg(user.username, user.password, user.email)
     return JSONResponse(content={"message": "User registered successfull"})
+
+
+create_table1()
 
 
 if __name__ == "__main__":
