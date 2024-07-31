@@ -7,10 +7,9 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import re
+import uvicorn
 
-
-email_sample = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
-
+REGEX = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
 
 app = FastAPI()
 
@@ -51,39 +50,39 @@ def create_table2():
     conn.close()
 
 
+def valid_email(email: str) -> bool:
+    return re.fullmatch(REGEX, email) is not None
+
+
 def user_exists(username: str, email: str) -> bool:
     conn = get_db_connection()
     c = conn.cursor()
     c.execute(
-        'SELECT 1 FROM name_table WHERE username_db = ?'
-        , (username,)
+        'SELECT 1 FROM users WHERE username_db = ?',
+        (username,)
     )
     exists1 = c.fetchone() is not None
-    if username in exists1: # тут пока ошибка не робит TypeError: argument of type 'bool' is not iterable
+    if exists1:
         return True
     c.execute(
-        'SELECT 1 FROM name_table WHERE email = ?'
-        , (email,)
+        'SELECT 1 FROM users WHERE email = ?',
+        (email,)
     )
-    exists = c.fetchone() is not None
-    if email in exists:
-        return True
+    exists2 = c.fetchone() is not None
     conn.close()
-    if re.fullmatch(email_sample, email):
-        return False
+    return exists2
 
 
 def reg(username: str, password: str, email: str):
+    if not valid_email(email):
+        raise HTTPException(status_code=400, detail="Invalid email format")
     if user_exists(username, email):
         raise HTTPException(status_code=400, detail="Username or email already exists")
-    else:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     conn = get_db_connection()
     c = conn.cursor()
     c.execute(
-        "INSERT INTO name_table (username_db, password_db, email) VALUES (?, ?, ?)",
+        "INSERT INTO users (username_db, password_db, email) VALUES (?, ?, ?)",
         (username, hashed_password, email),
     )
     conn.commit()
@@ -106,7 +105,7 @@ async def login(user: UserCreate, response: Response):
     conn = get_db_connection()
     c = conn.cursor()
     c.execute(
-        'SELECT * FROM name_table WHERE username_db = ? AND password_db = ? AND email = ?',
+        'SELECT * FROM users WHERE username_db = ? AND password_db = ? AND email = ?',
         (user.username, hashed_password, user.email)
     )
     user_row = c.fetchone()
@@ -115,8 +114,7 @@ async def login(user: UserCreate, response: Response):
     if user_row:
         session_token = generate_session_token(10)
         response.set_cookie(key="session_token", value=session_token, secure=True, httponly=True)
-        return response
-        return JSONResponse(content={"message": "Login successful"})
+        return response and JSONResponse(content=dict(message="Login successful"))
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -124,13 +122,13 @@ async def login(user: UserCreate, response: Response):
 @app.post("/register")
 async def register(user: UserCreate):
     reg(user.username, user.password, user.email)
-    return JSONResponse(content={"message": "User registered successfull"})
+    return JSONResponse(content={"message": "User registered successful"})
 
 
-create_table1()
+def main():
+    create_table1()
 
 
 if __name__ == "__main__":
-    import uvicorn
-
+    main()
     uvicorn.run(app, host="127.0.0.1", port=8000)
