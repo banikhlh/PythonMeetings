@@ -15,9 +15,13 @@ app = FastAPI()
 
 
 def get_db_connection():
-    conn = sqlite3.connect("DataBase.db")
-    conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        conn = sqlite3.connect("DataBase.db")
+        conn.row_factory = sqlite3.Row
+        return conn
+    except sqlite3.Error as e: # это проверка просто иногда у меня в таблицу не попадает
+        print(f"Database connection error: {e}")
+        raise HTTPException(status_code=500, detail="Database connection error")
 
 
 def create_table1():
@@ -35,42 +39,22 @@ def create_table1():
     conn.close()
 
 
-def create_table2():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute(
-        """CREATE TABLE IF NOT EXISTS meetings (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username_db TEXT UNIQUE,
-                    password_db TEXT,
-                    email TEXT UNIQUE
-                )"""
-    )
-    conn.commit()
-    conn.close()
-
-
-def valid_email(email: str) -> bool:
+def valid_email(email: str) -> bool: # не знаю почему но \ все ломает
     return re.fullmatch(REGEX, email) is not None
 
 
 def user_exists(username: str, email: str) -> bool:
     conn = get_db_connection()
     c = conn.cursor()
+    # Используем OR в одном запросе
     c.execute(
-        'SELECT 1 FROM users WHERE username_db = ?',
-        (username,)
+        'SELECT 1 FROM users WHERE username_db = ? OR email = ?',
+        (username, email)
     )
-    exists1 = c.fetchone() is not None
-    if exists1:
-        return True
-    c.execute(
-        'SELECT 1 FROM users WHERE email = ?',
-        (email,)
-    )
-    exists2 = c.fetchone() is not None
+    # Если хотя бы одна запись найдена, возвращаем True
+    exists = c.fetchone() is not None
     conn.close()
-    return exists2
+    return exists
 
 
 def reg(username: str, password: str, email: str):
@@ -103,10 +87,11 @@ class UserCreate(BaseModel):
 async def login(user: UserCreate, response: Response):
     hashed_password = hashlib.sha256(user.password.encode()).hexdigest()
     conn = get_db_connection()
-    c = conn.cursor()
+    c = conn.cursor() # сделал по другому, немного не понял тебя, но ты вроде предлагал, чтобы условно в email могло
+    # входить и пароль и собственно сама почта
     c.execute(
-        'SELECT * FROM users WHERE username_db = ? AND password_db = ? AND email = ?',
-        (user.username, hashed_password, user.email)
+        'SELECT * FROM users WHERE (username_db = ? AND password_db = ?) OR (email = ? AND password_db = ?)',
+        (user.username, hashed_password, user.email, hashed_password)
     )
     user_row = c.fetchone()
     conn.close()
