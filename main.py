@@ -46,12 +46,10 @@ def valid_email(email: str) -> bool: # не знаю почему но \ все 
 def user_exists(username: str, email: str) -> bool:
     conn = get_db_connection()
     c = conn.cursor()
-    # Используем OR в одном запросе
     c.execute(
         'SELECT 1 FROM users WHERE username_db = ? OR email = ?',
         (username, email)
     )
-    # Если хотя бы одна запись найдена, возвращаем True
     exists = c.fetchone() is not None
     conn.close()
     return exists
@@ -98,8 +96,9 @@ async def login(user: UserCreate, response: Response):
 
     if user_row:
         session_token = generate_session_token(10)
+        response = JSONResponse(content=dict(message="Login successful"))
         response.set_cookie(key="session_token", value=session_token, secure=True, httponly=True)
-        return response and JSONResponse(content=dict(message="Login successful"))
+        return response
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
