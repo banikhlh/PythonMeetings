@@ -2,7 +2,6 @@ import hashlib
 import random
 import sqlite3
 import string
-
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -19,7 +18,7 @@ def get_db_connection():
         conn = sqlite3.connect("DataBase.db")
         conn.row_factory = sqlite3.Row
         return conn
-    except sqlite3.Error as e: # это проверка просто иногда у меня в таблицу не попадает
+    except sqlite3.Error as e:  # это проверка просто иногда у меня в таблицу не попадает
         print(f"Database connection error: {e}")
         raise HTTPException(status_code=500, detail="Database connection error")
 
@@ -32,14 +31,23 @@ def create_table1():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username_db TEXT UNIQUE,
                     password_db TEXT,
-                    email TEXT UNIQUE
+                    email TEXT UNIQUE,
+                    status TEXT CHECK (status IN ('online', 'offline')) DEFAULT 'online'
+
                 )"""
     )
     conn.commit()
     conn.close()
 
 
-def valid_email(email: str) -> bool: # не знаю почему но \ все ломает
+def drop_table():
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(f"DROP TABLE IF EXISTS users")
+    conn.close()
+
+
+def valid_email(email: str) -> bool:  # не знаю почему, но \ все ломает
     return re.fullmatch(REGEX, email) is not None
 
 
@@ -84,6 +92,28 @@ class UserCreate(User):
     email: str
 
 
+def set_user_online(username: str):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(
+        "UPDATE users SET status = 'online' WHERE username_db = ?",
+        (username,)
+    )
+    conn.commit()
+    conn.close()
+
+
+def set_user_offline(username: str):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(
+        "UPDATE users SET status = 'offline' WHERE username_db = ?",
+        (username,)
+    )
+    conn.commit()
+    conn.close()
+
+
 @app.post("/login")
 async def login(user: User, response: Response):
     hashed_password = hashlib.sha256(user.password.encode()).hexdigest()
@@ -97,6 +127,7 @@ async def login(user: User, response: Response):
     conn.close()
 
     if user_row:
+        set_user_online(user.username)
         session_token = generate_session_token(10)
         response = JSONResponse(content=dict(message="Login successful"))
         response.set_cookie(key="session_token", value=session_token, secure=True, httponly=True)
@@ -105,10 +136,33 @@ async def login(user: User, response: Response):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
 
+@app.post("/logout")
+async def logout(user: User, response: Response):
+    hashed_password = hashlib.sha256(user.password.encode()).hexdigest()
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(
+        "SELECT * FROM users WHERE username_db = ? AND status = 'Online'",
+        (user.username,),
+    )
+    user_row = c.fetchone()
+    conn.close()
+
+    if user_row:
+        set_user_offline(user.username)
+        session_token = generate_session_token(10)
+        response.set_cookie(
+            key="session_token", value=session_token, secure=True, httponly=True
+        )
+        return JSONResponse(content={"message": "Logout successful"})
+    else:
+        return JSONResponse(content={"message": "You already logout"})
+
+
 @app.post("/register")
 async def register(user: UserCreate):
     reg(user.username, user.password, user.email)
-    return JSONResponse(content={"message": "User registered successful"})
+    return JSONResponse(content={"message": "User registered successfully"})
 
 
 def main():
