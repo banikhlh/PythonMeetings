@@ -151,10 +151,11 @@ async def logout(user: User, response: Response):
     if user_row:
         set_user_offline(user.username)
         session_token = generate_session_token(10)
+        response = JSONResponse(content={"message": "Logout successful"})
         response.set_cookie(
             key="session_token", value=session_token, secure=True, httponly=True
         )
-        return JSONResponse(content={"message": "Logout successful"})
+        return response
     else:
         return JSONResponse(content={"message": "You already logout"})
 
