@@ -75,21 +75,23 @@ def generate_session_token(length: int) -> str:
     return "".join(random.choices(string.ascii_letters + string.digits, k=length))
 
 
-class UserCreate(BaseModel):
+class User(BaseModel):
     username: str
     password: str
+
+
+class UserCreate(User):
     email: str
 
 
 @app.post("/login")
-async def login(user: UserCreate, response: Response):
+async def login(user: User, response: Response):
     hashed_password = hashlib.sha256(user.password.encode()).hexdigest()
     conn = get_db_connection()
-    c = conn.cursor() # сделал по другому, немного не понял тебя, но ты вроде предлагал, чтобы условно в email могло
-    # входить и пароль и собственно сама почта
+    c = conn.cursor()
     c.execute(
         'SELECT * FROM users WHERE (username_db = ? AND password_db = ?) OR (email = ? AND password_db = ?)',
-        (user.username, hashed_password, user.email, hashed_password)
+        (user.username, hashed_password, user.username, hashed_password)
     )
     user_row = c.fetchone()
     conn.close()
