@@ -1,78 +1,13 @@
-import hashlib
-import random
-import sqlite3
-import string
-
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-import re
 import uvicorn
+from defs import open_connect, close_connect, set_user_online, set_user_offline, create_table1, reg
+from common import generate_session_token
+import hashlib
 
-REGEX = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
 
 app = FastAPI()
-
-
-def get_db_connection():
-    try:
-        conn = sqlite3.connect("DataBase.db")
-        conn.row_factory = sqlite3.Row
-        return conn
-    except sqlite3.Error as e: # это проверка просто иногда у меня в таблицу не попадает
-        print(f"Database connection error: {e}")
-        raise HTTPException(status_code=500, detail="Database connection error")
-
-
-def create_table1():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute(
-        """CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username_db TEXT UNIQUE,
-                    password_db TEXT,
-                    email TEXT UNIQUE
-                )"""
-    )
-    conn.commit()
-    conn.close()
-
-
-def valid_email(email: str) -> bool: # не знаю почему но \ все ломает
-    return re.fullmatch(REGEX, email) is not None
-
-
-def user_exists(username: str, email: str) -> bool:
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute(
-        'SELECT 1 FROM users WHERE username_db = ? OR email = ?',
-        (username, email)
-    )
-    exists = c.fetchone() is not None
-    conn.close()
-    return exists
-
-
-def reg(username: str, password: str, email: str):
-    if not valid_email(email):
-        raise HTTPException(status_code=400, detail="Invalid email format")
-    if user_exists(username, email):
-        raise HTTPException(status_code=400, detail="Username or email already exists")
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO users (username_db, password_db, email) VALUES (?, ?, ?)",
-        (username, hashed_password, email),
-    )
-    conn.commit()
-    conn.close()
-
-
-def generate_session_token(length: int) -> str:
-    return "".join(random.choices(string.ascii_letters + string.digits, k=length))
 
 
 class User(BaseModel):
@@ -85,21 +20,43 @@ class UserCreate(User):
 
 
 @app.post("/login")
-async def login(user: User, response: Response):
+async def login(user: User):
     hashed_password = hashlib.sha256(user.password.encode()).hexdigest()
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute(
-        'SELECT * FROM users WHERE (username_db = ? AND password_db = ?) OR (email = ? AND password_db = ?)',
-        (user.username, hashed_password, user.username, hashed_password)
+    cursor, connect = open_connect()
+    cursor.execute(
+            'SELECT * FROM users WHERE (username_db = ? AND password_db = ?) OR (email = ? AND password_db = ?)',
+            (user.username, hashed_password, user.username, hashed_password)
     )
-    user_row = c.fetchone()
-    conn.close()
-
+    user_row = cursor.fetchone()
+    close_connect(connect)
     if user_row:
+        set_user_online(user.username)
         session_token = generate_session_token(10)
         response = JSONResponse(content=dict(message="Login successful"))
-        response.set_cookie(key="session_token", value=session_token, secure=True, httponly=True)
+        response.set_cookie(
+            key="session_token", value=session_token, secure=True, httponly=True
+        )
+        return response
+    else:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+
+@app.post("/logout")
+async def logout(user: User):
+    cursor, connect = open_connect()
+    cursor.execute(
+        "SELECT * FROM users WHERE username_db = ? AND status = 'online'",
+        (user.username,)
+    )
+    user_row = cursor.fetchone()
+    close_connect(connect)
+    if user_row:
+        set_user_offline(user.username)
+        session_token = generate_session_token(10)
+        response = JSONResponse(content={"message": "Logout successful"})
+        response.set_cookie(
+            key="session_token", value=session_token, secure=True, httponly=True
+        )
         return response
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -108,7 +65,7 @@ async def login(user: User, response: Response):
 @app.post("/register")
 async def register(user: UserCreate):
     reg(user.username, user.password, user.email)
-    return JSONResponse(content={"message": "User registered successful"})
+    return JSONResponse(content={"message": "User registered successfully"})
 
 
 def main():
