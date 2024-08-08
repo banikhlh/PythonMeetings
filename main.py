@@ -2,11 +2,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
-from defs import open_connect, close_connect, set_user_online, set_user_offline, create_table1, reg, meet_func
+from defs import open_connect, close_connect, set_user_online, set_user_offline, create_table1, reg, meet_func, create_table2
 from common import generate_session_token
 import hashlib
-from typing import List
-from datetime import datetime
 
 
 app = FastAPI()
@@ -72,24 +70,28 @@ async def logout(user: User):
 
 @app.post("/register")
 async def register(user: UserCreate):
-    reg(user.username, user.password, user.email)
+    cursor, conn = open_connect()
+    reg(user.username, user.password, user.email, cursor)
+    close_connect(conn)
     return JSONResponse(content={"message": "User registered successfully"})
 
 
 class Meet(BaseModel):
     name: str
-    members: List[str]
-    datetime: datetime
+    members: str
+    datetime: str
 
 
 @app.post("/create_meet")
 async def create_meet(meet: Meet, request: Request):
-    if meet_func(request, meet.name, meet.members, meet.datetime):
-        return JSONResponse(content={"message": "Meeting created successfully"})
+    cursor, conn = open_connect()
+    meet_func(request, meet.name, meet.members, meet.datetime, cursor)
+    close_connect(conn)
 
 
 def main():
     create_table1()
+    create_table2()
 
 
 if __name__ == "__main__":

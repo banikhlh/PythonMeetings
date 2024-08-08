@@ -4,7 +4,6 @@ from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 import hashlib
 from common import valid_email, generate_session_token
-from typing import List
 from datetime import datetime
 
 
@@ -49,7 +48,7 @@ def create_table2():
             organizer TEXT,
             name TEXT UNIQUE,
             members TEXT,
-            datetime TEXT        
+            datetime DATETIME        
         )""")
     close_connect(connect)
 
@@ -63,66 +62,73 @@ def get_cookie(request: Request, cursor):
         (session_token,)
     )
     exists = cursor.fetchone() is not None
-    return exists
-    if exists:
+    if not exists:
         return HTTPException(status_code=401, detail="Invalid session token")
     else:
         return session_token
 
 
-def meet_func(request: Request, name: str, members: List[str], dt: datetime):
-    cursor, conn = open_connect()
+def validate_datetime_format(datetime_str: str, format_str: str = '%Y-%m-%d %H:%M:%S') -> bool:
+    if datetime.strptime(datetime_str, format_str):
+        return True
+    else:
+        return False
+
+
+def meet_func(request: Request, name: str, members: str, dt: str, cursor):
     cookie = get_cookie(request, cursor)
     if cookie is None:
-        return HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     cursor.execute(
         'SELECT * FROM users WHERE session_token = ?',
         (cookie,)
     )
-    user = cursor.fetchone()
-    if name is None:
-        name = f'{user}s meeting'
+    organizer = cursor.fetchone()
+    organizer_n = organizer['username_db']
+    if not organizer:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not name:
+        name = f"{organizer_n}'s meeting {dt}"
+    if not dt:
+        raise HTTPException(status_code=400,detail="Datetime is required and must be in the format YYYY-MM-DD HH:MM:SS")
     now = datetime.now()
-    iso_format = now.isoformat()
-    dt_iso = "2024-08-06T10:00:00"
-    if dt_iso != iso_format:
-        return HTTPException(status_code=401, detail="Invalid datetime format, need YYYY-MM-DDTHH:MM:SS")
-    if members is None:
-        return HTTPException(status_code=401, detail="People should be in the meeting")
+    if not validate_datetime_format(dt):
+        raise HTTPException(status_code=400, detail="Invalid datetime format, need YYYY-MM-DD HH:MM:SS")
+    dt = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
+    if now >= dt:
+        raise HTTPException(status_code=400, detail="Datetime must be in the future")
+    if not members:
+        raise HTTPException(status_code=400, detail="People should be in the meeting")
     cursor.execute(
-        "INSERT INTO meets (organizer, name, members, datetime) VALUES (?, ?, ?)",
-        (user, name, members, dt)
+        "INSERT INTO meetings (organizer, name, members, datetime) VALUES (?, ?, ?, ?)",
+        (organizer_n, name, members, dt)
     )
-    close_connect(conn)
-    return True
+    response = JSONResponse(content={"message": "Meeting created successfully"}, status_code=201)
+    return response
 
 
-def user_exists(username: str, email: str) -> bool:
-    cursor, connect = open_connect()
+def user_exists(username: str, email: str, cursor) -> bool:
     cursor.execute(
         'SELECT 1 FROM users WHERE username_db = ? OR email = ?',
         (username, email)
     )
     exists = cursor.fetchone() is not None
-    close_connect(connect)
     return exists
 
 
-def reg(username: str, password: str, email: str):
+def reg(username: str, password: str, email: str, cursor):
     if not valid_email(email):
         raise HTTPException(status_code=400, detail="Invalid email format")
-    if user_exists(username, email):
+    if user_exists(username, email, cursor):
         raise HTTPException(status_code=400, detail="Username or email already exists")
-    cursor, conn = open_connect()
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     set_user_online(username, cursor)
     create_session_token = generate_session_token(10)
     cursor.execute(
-        "INSERT INTO users username_db = ?, password_db = ?, email = ?, session_token = ?",
+        "INSERT INTO users (username_db, password_db, email, session_token) VALUES (?, ?, ?, ?)",
         (username, hashed_password, email, create_session_token)
     )
-    close_connect(conn)
-    response = JSONResponse(content=dict(message="Login successful"))
+    response = JSONResponse(content=dict(message="Registration successful"))
     response.set_cookie(
         key="session_token", value=create_session_token, secure=True, httponly=True
     )
