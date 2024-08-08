@@ -1,6 +1,6 @@
 import sqlite3
 from sqlite3 import Connection, Cursor
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, Cookie
 from fastapi.responses import JSONResponse
 import hashlib
 from common import valid_email, generate_session_token
@@ -53,21 +53,6 @@ def create_table2():
     close_connect(connect)
 
 
-def get_cookie(request: Request, cursor):
-    session_token = request.cookies.get("session_token")
-    if not session_token:
-        raise HTTPException(status_code=401, detail="No session token provided")
-    cursor.execute(
-        'SELECT 1 FROM users WHERE session_token = ?',
-        (session_token,)
-    )
-    exists = cursor.fetchone() is not None
-    if not exists:
-        return HTTPException(status_code=401, detail="Invalid session token")
-    else:
-        return session_token
-
-
 def validate_datetime_format(datetime_str: str, format_str: str = '%Y-%m-%d %H:%M:%S') -> bool:
     if datetime.strptime(datetime_str, format_str):
         return True
@@ -75,22 +60,21 @@ def validate_datetime_format(datetime_str: str, format_str: str = '%Y-%m-%d %H:%
         return False
 
 
-def meet_func(request: Request, name: str, members: str, dt: str, cursor):
-    cookie = get_cookie(request, cursor)
+def meet_func(name: str, members: str, dt: str, cursor, cookie):
     if cookie is None:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     cursor.execute(
-        'SELECT * FROM users WHERE session_token = ?',
+        'SELECT 1 FROM users WHERE session_token = ?',
         (cookie,)
     )
     organizer = cursor.fetchone()
-    organizer_n = organizer['username_db']
     if not organizer:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    organizer_n = organizer["username_db"]
     if not name:
         name = f"{organizer_n}'s meeting {dt}"
     if not dt:
-        raise HTTPException(status_code=400,detail="Datetime is required and must be in the format YYYY-MM-DD HH:MM:SS")
+        raise HTTPException(status_code=400, detail="Datetime is required and must be in the format YYYY-MM-DD HH:MM:SS")
     now = datetime.now()
     if not validate_datetime_format(dt):
         raise HTTPException(status_code=400, detail="Invalid datetime format, need YYYY-MM-DD HH:MM:SS")
@@ -130,7 +114,11 @@ def reg(username: str, password: str, email: str, cursor):
     )
     response = JSONResponse(content=dict(message="Registration successful"))
     response.set_cookie(
-        key="session_token", value=create_session_token, secure=True, httponly=True
+        key="last_visit",
+        value=create_session_token,
+        secure=True,
+        httponly=True,
+        samesite=None
     )
     return response
 
@@ -147,3 +135,56 @@ def set_user_offline(username: str, cursor):
         "UPDATE users SET status = 'offline' WHERE username_db = ?",
         (username,)
     )
+
+
+def login_func(username, password):
+    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+    cursor, connect = open_connect()
+    cursor.execute(
+            'SELECT * FROM users WHERE (username_db = ? AND password_db = ?) OR (email = ? AND password_db = ?)',
+            (username, hashed_password, username, hashed_password)
+    )
+    user_row = cursor.fetchone()
+    if user_row:
+        set_user_online(username, cursor)
+        create_session_token = generate_session_token(10)
+        cursor.execute(
+            "UPDATE users SET session_token = ? WHERE username_db = ?",
+            (create_session_token, username)
+        )
+        close_connect(connect)
+        response = JSONResponse(content=dict(message="Login successful"))
+        response.set_cookie(
+            key="session_token",
+            value=create_session_token,
+            secure=True,
+            httponly=True
+        )
+        return response
+    else:
+        close_connect(connect)
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+
+def logout_func(username):
+    cursor, connect = open_connect()
+    cursor.execute(
+        "SELECT * FROM users WHERE username_db = ? AND status = 'online'",
+        (username,)
+    )
+    user_row = cursor.fetchone()
+    if user_row:
+        set_user_offline(username, cursor)
+        create_session_token = generate_session_token(10)
+        close_connect(connect)
+        response = JSONResponse(content=dict(message="Login successful"))
+        response.set_cookie(
+            key="session_token",
+            value=create_session_token,
+            secure=True,
+            httponly=True
+        )
+        return response
+    else:
+        close_connect(connect)
+        raise HTTPException(status_code=401, detail="Invalid credentials")
