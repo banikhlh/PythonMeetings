@@ -1,0 +1,129 @@
+body {
+    text-align: center;
+    font-family: 'Arial', 'Verdana', sans-serif;
+}
+
+.info-bar {
+    display: inline-block;
+    padding: 10px 20px;
+    font-size: 16px;
+    text-align: center;
+    text-decoration: none;
+    color: white;
+    background-color: #2196F3;
+    border-radius: 20px;
+    border: none;
+    margin: 5px;
+    cursor: default;
+}
+
+.info-bar.success {
+    background-color: #4CAF50;
+}
+
+.info-bar.error {
+    background-color: #f44336;
+}
+
+.info-bar.warning {
+    background-color: #ff9800;
+}
+
+.rectangle {
+	width: 500px;
+	height: 260px;
+	background: white;
+    border-radius: 20px;
+    border-color: #4CAF50;
+    border-width: 10px;
+    border-style: solid;
+    display: inline-block;
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.button {
+    display: inline-block;
+    padding: 10px 20px;
+    font-size: 16px;
+    text-align: center;
+    text-decoration: none;
+    color: white;
+    background-color: #4CAF50;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+}
+
+.button:hover {
+    background-color: #45a049;
+}
+
+.input-container {
+    margin: 20px 0;
+    text-align: center;
+    
+}
+
+.input-field {
+    display: inline-block;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+button {
+    display: flex;
+    margin: 0 auto;
+    padding: 10px 50px;
+    font-size: 16px;
+    text-align: center;
+    text-decoration: none;
+    color: white;
+    background-color: #4CAF50;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    margin-top: 27px;
+    margin-bottom: -18px;
+    justify-content: center;
+    align-self: center;
+}
+
+h1 {
+    text-align: center;
+}
+
+a {
+    display: inline-flex;
+    margin: 0 auto;
+    padding: 10px 45px;
+    font-size: 16px;
+    text-align: center;
+    text-decoration: none;
+    color: white;
+    background-color: #4CAF50;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    margin-top: 27px;
+    margin-bottom: -18px;
+    justify-content: center;
+    align-self: center;
+}
+
+form {
+    background: white;
+    height: 100%;
+    border-radius: 20px;
+    border-color: #4CAF50;
+    border-width: 10px;
+    border-style: solid;
+    text-align:center;
+    align-items: center;
+    justify-content: center;
+}

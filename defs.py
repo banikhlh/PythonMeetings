@@ -5,6 +5,11 @@ from fastapi.responses import JSONResponse
 import hashlib
 from common import valid_email, generate_session_token
 from datetime import datetime
+from commonmark import commonmark
+from fastapi.templating import Jinja2Templates
+
+
+templates = Jinja2Templates(directory="templates", autoescape=False, auto_reload=True)
 
 
 def get_db_connection():
@@ -46,49 +51,67 @@ def create_table2():
     cursor.execute("""CREATE TABLE IF NOT EXISTS meetings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             organizer TEXT,
-            name TEXT UNIQUE,
+            name TEXT,
             members TEXT,
             datetime DATETIME        
         )""")
     close_connect(connect)
 
 
-def validate_datetime_format(datetime_str: str, format_str: str = '%Y-%m-%d %H:%M:%S') -> bool:
+def validate_datetime_format(datetime_str: str, format_str: str = '%Y-%m-%dT%H:%M') -> bool:
     if datetime.strptime(datetime_str, format_str):
         return True
     else:
         return False
 
 
-def meet_func(name: str, members: str, dt: str, cursor, cookie):
+def meet_func(name: str, members: str, dt: str, cookie, request):
+    cursor, conn = open_connect()
     if cookie is None:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     cursor.execute(
-        'SELECT 1 FROM users WHERE session_token = ?',
+        'SELECT * FROM users WHERE session_token = ?',
         (cookie,)
     )
     organizer = cursor.fetchone()
     if not organizer:
+        close_connect(conn)
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    organizer_n = organizer["username_db"]
+    organizer_n = organizer[1]
+    cursor.execute(
+        'SELECT * FROM meetings WHERE name = ?',
+        (name,)
+    )
+    exists = cursor.fetchone() is not None
+    if exists:
+        close_connect(conn)
+        raise HTTPException(status_code=400, detail="Meeting name already exists")
     if not name:
         name = f"{organizer_n}'s meeting {dt}"
     if not dt:
-        raise HTTPException(status_code=400, detail="Datetime is required and must be in the format YYYY-MM-DD HH:MM:SS")
+        close_connect(conn)
+        raise HTTPException(status_code=400, detail="Datetime is required and must be in the format YYYY-MM-DD HH:MM")
     now = datetime.now()
     if not validate_datetime_format(dt):
+        close_connect(conn)
         raise HTTPException(status_code=400, detail="Invalid datetime format, need YYYY-MM-DD HH:MM:SS")
-    dt = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
+    dt = datetime.strptime(dt, '%Y-%m-%dT%H:%M')
     if now >= dt:
+        close_connect(conn)
         raise HTTPException(status_code=400, detail="Datetime must be in the future")
     if not members:
+        close_connect(conn)
         raise HTTPException(status_code=400, detail="People should be in the meeting")
     cursor.execute(
         "INSERT INTO meetings (organizer, name, members, datetime) VALUES (?, ?, ?, ?)",
         (organizer_n, name, members, dt)
     )
-    response = JSONResponse(content={"message": "Meeting created successfully"}, status_code=201)
-    return response
+    close_connect(conn)
+    context = {
+        "request": request,
+        "data": "Create meeting "
+    }
+    return templates.TemplateResponse("template.html", context)
 
 
 def user_exists(username: str, email: str, cursor) -> bool:
@@ -100,10 +123,13 @@ def user_exists(username: str, email: str, cursor) -> bool:
     return exists
 
 
-def reg(username: str, password: str, email: str, cursor):
+def reg(username: str, password: str, email: str):
+    cursor, conn = open_connect()
     if not valid_email(email):
+        close_connect(conn)
         raise HTTPException(status_code=400, detail="Invalid email format")
     if user_exists(username, email, cursor):
+        close_connect(conn)
         raise HTTPException(status_code=400, detail="Username or email already exists")
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     set_user_online(username, cursor)
@@ -112,6 +138,7 @@ def reg(username: str, password: str, email: str, cursor):
         "INSERT INTO users (username_db, password_db, email, session_token) VALUES (?, ?, ?, ?)",
         (username, hashed_password, email, create_session_token)
     )
+    close_connect(conn)
     response = JSONResponse(content=dict(message="Registration successful"))
     response.set_cookie(
         key="last_visit",
@@ -188,3 +215,7 @@ def logout_func(username):
     else:
         close_connect(connect)
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+
+def marked_filter(text):
+    return commonmark(text)

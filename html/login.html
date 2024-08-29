@@ -2,37 +2,9 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Войти</title>
+    <title>Login</title>
+    <link href="{{ url_for('static', path='css/styles.css') }}" rel="stylesheet">
     <style>
-        .input-container {
-            margin: 20px 0;
-        }
-
-        .input-field {
-            display: inline-block;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            width: 300px;
-            box-sizing: border-box;
-        }
-
-        .submit-button {
-            display: inline-block;
-            padding: 10px 20px;
-            font-size: 16px;
-            color: white;
-            background-color: #4CAF50;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-
-        .submit-button:hover {
-            background-color: #45a049;
-        }
     </style>
 </head>
 <body>
@@ -41,33 +13,16 @@
         <h1>Login</h1>
     <form action="/login" method="post">
         <div class="input-container">
-            <input type="username" name="username" class="input-field" placeholder="Введите имя">
+            <input type="username" name="username" class="input-field" placeholder="Name">
         </div>
         <div class="input-container">
-            <input type="password" name="password" id="password" class="input-field" placeholder="Введите пароль">
+            <input type="password" name="password" id="password" class="input-field" placeholder="Password">
         </div>
-        <button type="submit" class="submit-button">Отправить</button>
+        <button type="submit" class="submit-button">Send</button>
+        <button type="reset" class="reset-button">Reset</button>
+        <a href="http://127.0.0.1:8000">Menu</a>
+
     </form>
-<br>
-    <a href="http://127.0.0.1:8000" class="button">На главную</a>
-
-<style>
-.button {
-    display: inline-block;
-    padding: 10px 20px;
-    font-size: 16px;
-    text-align: center;
-    text-decoration: none;
-    color: white;
-    background-color: #4CAF50;
-    border-radius: 5px;
-    border: none;
-    cursor: pointer;
-}
-
-.button:hover {
-    background-color: #45a049;
-}
-</style>
+    
 </body>
 </html>

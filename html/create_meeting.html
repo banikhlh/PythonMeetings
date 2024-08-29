@@ -1,76 +1,32 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Создание встречи</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create meeting</title>
+    <link href="{{ url_for('static', path='css/styles.css') }}" rel="stylesheet">
     <style>
-        .input-container {
-            margin: 20px 0;
-        }
 
-        .input-field {
-            display: inline-block;
-            padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            width: 458px;
-            box-sizing: border-box;
-        }
-
-        .submit-button {
-            display: inline-block;
-            padding: 10px 20px;
-            font-size: 16px;
-            color: white;
-            background-color: #4CAF50;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-
-        .submit-button:hover {
-            background-color: #45a049;
-        }
     </style>
 </head>
 <body>
-
-
+    <div class="container">
         <h1>Create a meeting</h1>
-    <form action="/create_meeting" method="post">
-        <div class="input-container">
-            <input type="text" name="name" class="input-field" placeholder="Введите название (необязательно)">
-        </div>
-        <div class="input-container">
-            <input type="text" name="members" class="input-field" placeholder="Введите имена участников">
-        </div>
-        <div class="input-container">
-            <input type="text" name="datetime" class="input-field" placeholder='Введите дату и время в формате "YYYY-MM-DD HH:MM:SS"'>
-        </div>
-        <button type="submit" class="submit-button">Отправить</button>
-    </form>
-<br>
-    <a href="http://127.0.0.1:8000" class="button">На главную</a>
-
-<style>
-.button {
-    display: inline-block;
-    padding: 10px 20px;
-    font-size: 16px;
-    text-align: center;
-    text-decoration: none;
-    color: white;
-    background-color: #4CAF50;
-    border-radius: 5px;
-    border: none;
-    cursor: pointer;
-}
-
-.button:hover {
-    background-color: #45a049;
-}
-</style>
+        <form action="/create_meeting" method="post">
+            <div class="input-container">
+                <input type="text" name="name" class="input-field" placeholder="Name">
+            </div>
+            <div class="input-container">
+                <input type="text" name="members" class="input-field" placeholder="Members">
+            </div>
+            <div class="input-container">
+                <input type="datetime-local" name="datetime" class="input-field" placeholder='DateTime in format "YYYY-MM-DD HH:MM AM/PM"'>
+            </div>
+            <input type="hidden" name="id" value="create_meeting">
+            <button type="submit">Send</button>
+            <button type="reset">Reset</button>
+            <a href="http://127.0.0.1:8000">Menu</a>
+        </form>
+    </div>
 </body>
 </html>
