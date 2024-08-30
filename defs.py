@@ -1,12 +1,12 @@
 import sqlite3
 from sqlite3 import Connection, Cursor
-from fastapi import HTTPException, Request, Cookie
+from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 import hashlib
 from common import valid_email, generate_session_token
 from datetime import datetime
-from commonmark import commonmark
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 
 
 templates = Jinja2Templates(directory="templates", autoescape=False, auto_reload=True)
@@ -65,10 +65,17 @@ def validate_datetime_format(datetime_str: str, format_str: str = '%Y-%m-%dT%H:%
         return False
 
 
-def meet_func(name: str, members: str, dt: str, cookie, request):
+def meet_func(name, members, dt, cookie, request):
     cursor, conn = open_connect()
     if cookie is None:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        close_connect(conn)
+        context = {
+        "request": request,
+        "data_num": "401",
+        "data" : "You're not logined",
+        "src" : "create_meeting"
+        }
+        return templates.TemplateResponse("template_error.html", context)
     cursor.execute(
         'SELECT * FROM users WHERE session_token = ?',
         (cookie,)
@@ -76,32 +83,59 @@ def meet_func(name: str, members: str, dt: str, cookie, request):
     organizer = cursor.fetchone()
     if not organizer:
         close_connect(conn)
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        context = {
+        "request": request,
+        "data_num": "401",
+        "data" : "Invalid credentials",
+        "src" : "create_meeting"
+        }
+        return templates.TemplateResponse("template_error.html", context)
     organizer_n = organizer[1]
+    if name is None:
+        name = f"{organizer_n}'s meeting {dt}"
     cursor.execute(
         'SELECT * FROM meetings WHERE name = ?',
         (name,)
     )
-    exists = cursor.fetchone() is not None
+    exists = cursor.fetchone()
     if exists:
         close_connect(conn)
-        raise HTTPException(status_code=400, detail="Meeting name already exists")
-    if not name:
-        name = f"{organizer_n}'s meeting {dt}"
-    if not dt:
+        context = {
+        "request": request,
+        "data_num": "400",
+        "data" : "Meeting name already exists",
+        "src" : "create_meeting"
+        }
+        return templates.TemplateResponse("template_error.html", context)
+    if dt is None:
         close_connect(conn)
-        raise HTTPException(status_code=400, detail="Datetime is required and must be in the format YYYY-MM-DD HH:MM")
+        context = {
+        "request": request,
+        "data_num": "400",
+        "data" : "DateTime cannot be empty",
+        "src" : "create_meeting"
+        }
+        return templates.TemplateResponse("template_error.html", context)
     now = datetime.now()
-    if not validate_datetime_format(dt):
-        close_connect(conn)
-        raise HTTPException(status_code=400, detail="Invalid datetime format, need YYYY-MM-DD HH:MM:SS")
     dt = datetime.strptime(dt, '%Y-%m-%dT%H:%M')
     if now >= dt:
         close_connect(conn)
-        raise HTTPException(status_code=400, detail="Datetime must be in the future")
-    if not members:
+        context = {
+        "request": request,
+        "data_num": "400",
+        "data" : "Datetime must be in future",
+        "src" : "create_meeting"
+        }
+        return templates.TemplateResponse("template_error.html", context)
+    if members is None:
         close_connect(conn)
-        raise HTTPException(status_code=400, detail="People should be in the meeting")
+        context = {
+        "request": request,
+        "data_num": "400",
+        "data" : "People should be in the meeting",
+        "src" : "create_meeting"
+        }
+        return templates.TemplateResponse("template_error.html", context)
     cursor.execute(
         "INSERT INTO meetings (organizer, name, members, datetime) VALUES (?, ?, ?, ?)",
         (organizer_n, name, members, dt)
@@ -109,7 +143,8 @@ def meet_func(name: str, members: str, dt: str, cookie, request):
     close_connect(conn)
     context = {
         "request": request,
-        "data": "Create meeting "
+        "data": "Create meeting ",
+        "src" : "create_meeting"
     }
     return templates.TemplateResponse("template.html", context)
 
@@ -123,14 +158,50 @@ def user_exists(username: str, email: str, cursor) -> bool:
     return exists
 
 
-def reg(username: str, password: str, email: str):
+def reg(username, password, email, request):
+    if username is None:
+        context = {
+            "request": request,
+            "data_num": "400",
+            "data": "Username cannot be empty",
+            "src" : "registration"
+        }
+        return templates.TemplateResponse("template_error.html", context)
+    if password is None:
+        context = {
+            "request": request,
+            "data_num": "400",
+            "data": "Password cannot be empty",
+            "src" : "registration"
+        }
+        return templates.TemplateResponse("template_error.html", context)
+    if email is None:
+        context = {
+            "request": request,
+            "data_num": "400",
+            "data": "Email cannot be empty",
+            "src" : "registration"
+        }
+        return templates.TemplateResponse("template_error.html", context)
     cursor, conn = open_connect()
     if not valid_email(email):
         close_connect(conn)
-        raise HTTPException(status_code=400, detail="Invalid email format")
+        context = {
+            "request": request,
+            "data_num": "400",
+            "data": "Invalid email format",
+            "src" : "registration"
+        }
+        return templates.TemplateResponse("template_error.html", context)
     if user_exists(username, email, cursor):
         close_connect(conn)
-        raise HTTPException(status_code=400, detail="Username or email already exists")
+        context = {
+            "request": request,
+            "data_num": "400",
+            "data": "Username or email already exists",
+            "src" : "registration"
+        }
+        return templates.TemplateResponse("template_error.html", context)
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     set_user_online(username, cursor)
     create_session_token = generate_session_token(10)
@@ -139,13 +210,18 @@ def reg(username: str, password: str, email: str):
         (username, hashed_password, email, create_session_token)
     )
     close_connect(conn)
-    response = JSONResponse(content=dict(message="Registration successful"))
+    context = {
+        "request": request,
+        "data": "Login ",
+        "src" : "login"
+    }
+    html_content = templates.TemplateResponse("template.html", context).body.decode('utf-8')
+    response = HTMLResponse(content=html_content)
     response.set_cookie(
-        key="last_visit",
+        key="session_token",
         value=create_session_token,
         secure=True,
-        httponly=True,
-        samesite=None
+        httponly=True
     )
     return response
 
@@ -157,14 +233,14 @@ def set_user_online(username: str, cursor):
     )
 
 
-def set_user_offline(username: str, cursor):
+def set_user_offline(cookie: str, cursor):
     cursor.execute(
-        "UPDATE users SET status = 'offline' WHERE username_db = ?",
-        (username,)
+        "UPDATE users SET status = 'offline' WHERE sesson_token = ?",
+        (cookie,)
     )
 
 
-def login_func(username, password):
+def login_func(username, password, request):
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     cursor, connect = open_connect()
     cursor.execute(
@@ -180,7 +256,13 @@ def login_func(username, password):
             (create_session_token, username)
         )
         close_connect(connect)
-        response = JSONResponse(content=dict(message="Login successful"))
+        context = {
+            "request": request,
+            "data": "Login ",
+            "src" : "login"
+        }
+        html_content = templates.TemplateResponse("template.html", context).body.decode('utf-8')
+        response = HTMLResponse(content=html_content)
         response.set_cookie(
             key="session_token",
             value=create_session_token,
@@ -190,21 +272,41 @@ def login_func(username, password):
         return response
     else:
         close_connect(connect)
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        context = {
+        "request": request,
+        "data_num": "401",
+        "data" : "Invalid credentials",
+        "src" : "login"
+        }
+        return templates.TemplateResponse("template_error.html", context)
 
 
-def logout_func(username):
+def logout_func(cookie, request):
+    if cookie is None:
+        context = {
+        "request": request,
+        "data_num": "401",
+        "data" : "You're not login",
+        "src" : None
+        }
+        return templates.TemplateResponse("template_error.html", context)
     cursor, connect = open_connect()
     cursor.execute(
-        "SELECT * FROM users WHERE username_db = ? AND status = 'online'",
-        (username,)
+        "SELECT * FROM users WHERE session_token = ? AND status = 'online'",
+        (cookie,)
     )
     user_row = cursor.fetchone()
     if user_row:
-        set_user_offline(username, cursor)
+        set_user_offline(cookie, cursor)
         create_session_token = generate_session_token(10)
         close_connect(connect)
-        response = JSONResponse(content=dict(message="Login successful"))
+        context = {
+            "request": request,
+            "data": "Login ",
+            "src" : "logout"
+        }
+        html_content = templates.TemplateResponse("template.html", context).body.decode('utf-8')
+        response = HTMLResponse(content=html_content)
         response.set_cookie(
             key="session_token",
             value=create_session_token,
@@ -214,8 +316,18 @@ def logout_func(username):
         return response
     else:
         close_connect(connect)
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        context = {
+            "request": request,
+            "data_num": "401",
+            "data" : "Invalid credentials",
+            "src" : "logout"
+        }
+        return templates.TemplateResponse("template_error.html", context)
     
 
-def marked_filter(text):
-    return commonmark(text)
+def get_data_from_db():
+    cursor, conn = open_connect()
+    cursor.execute("SELECT * FROM meetings")
+    rows = cursor.fetchall()
+    close_connect(conn)
+    return rows

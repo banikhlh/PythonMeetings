@@ -1,19 +1,14 @@
 from fastapi import FastAPI, Request, Form, Cookie
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 import uvicorn
-from defs import open_connect, close_connect, login_func, logout_func, create_table1, reg, meet_func, create_table2
+from defs import login_func, logout_func, create_table1, reg, meet_func, create_table2, get_data_from_db
 from jinja2 import Environment, FileSystemLoader
-from starlette.applications import Starlette
-from starlette.routing import Route, Mount
 from starlette.templating import Jinja2Templates
 from starlette.staticfiles import StaticFiles
-import typing
 from starlette.requests import Request
-from starlette.testclient import TestClient
+from typing import Union
 
 
 app = FastAPI()
@@ -27,31 +22,17 @@ templates = Jinja2Templates(directory="templates", autoescape=False, auto_reload
 env = Environment(loader=FileSystemLoader('html'))
 
 
-class User(BaseModel):
-    username: str
-    password: str
-
-
-class UserCreate(User):
-    email: str
-
-
 @app.post("/login")
 async def login(request: Request, 
     username: str = Form(...),
     password: str = Form(...)):
-    login_func(username, password)
-    context = {
-        "request": request,
-        "data": "Login "
-    }
-    return templates.TemplateResponse("template.html", context)
+    return login_func(username, password, request)
 
 
 @app.post("/logout")
 async def logout(request: Request,
-    username: str = Form(...)):
-    logout_func(username)
+    session_token = Cookie(None)):
+    logout_func(session_token, request)
     context = {
         "request": request,
         "data": "Logout "
@@ -61,10 +42,10 @@ async def logout(request: Request,
 
 @app.post("/registration", response_class=HTMLResponse)
 async def registration(request: Request,
-    username: str = Form(...),
-    password: str = Form(...),
-    email: str = Form(...)):
-    reg(username, password, email)
+    username: str = Form(None),
+    password: str = Form(None),
+    email: str = Form(None)):
+    reg(username, password, email, request)
     context = {
         "request": request,
         "data": "Registration "
@@ -74,10 +55,10 @@ async def registration(request: Request,
 
 @app.post("/create_meeting", response_class=HTMLResponse)
 async def create_meet(request: Request,
-    name: str = Form(),
-    members: str = Form(),
-    datetime: str = Form(),
-    session_token = Cookie()
+    name: str = Form(None),
+    members: str = Form(None),
+    datetime: str = Form(None),
+    session_token = Cookie(None)
     ):
     return meet_func(name, members, datetime, session_token, request)
 
@@ -87,16 +68,26 @@ async def read_root(request: Request):
     return html.TemplateResponse("index.html", {"request": request})
 
 @app.get("/create_meeting", response_class=HTMLResponse)
-async def read_root_cm(request: Request):
+async def read_root_1(request: Request):
     return html.TemplateResponse("create_meeting.html", {"request": request})
 
 @app.get("/login", response_class=HTMLResponse)
-async def read_root_l(request: Request):
+async def read_root_2(request: Request):
     return html.TemplateResponse("login.html", {"request": request})
 
 @app.get("/registration", response_class=HTMLResponse)
-async def read_root_r(request: Request):
+async def read_root_3(request: Request):
     return html.TemplateResponse("registration.html", {"request": request})
+
+
+@app.get("/meetings")
+async def read_table(request: Request):
+    data = get_data_from_db()
+    context = {
+        "request": request,
+        "data" : data
+        }
+    return html.TemplateResponse("meetings.html", context)
 
 
 def main():
