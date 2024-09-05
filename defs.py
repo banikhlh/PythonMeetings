@@ -1,31 +1,21 @@
-import sqlite3
-from sqlite3 import Connection, Cursor
-<<<<<<< HEAD
+from sqlite3 import Connection, Cursor, connect, Error, Row
 from fastapi import HTTPException
-from fastapi.responses import JSONResponse
 import hashlib
 from common import valid_email, generate_session_token
-from datetime import datetime, timedelta
+from datetime import datetime
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
 
 templates = Jinja2Templates(directory="templates", autoescape=False, auto_reload=True)
-=======
-from fastapi import HTTPException, Request
-from fastapi.responses import JSONResponse
-import hashlib
-from common import valid_email, generate_session_token
-from datetime import datetime
->>>>>>> 25a7876cf225a7d44148e336ac6c9a643c5f3993
 
 
 def get_db_connection():
     try:
-        conn = sqlite3.connect("DataBase.db")
-        conn.row_factory = sqlite3.Row
+        conn = connect("DataBase.db")
+        conn.row_factory = Row
         return conn
-    except sqlite3.Error as e:
+    except Error as e:
         print(f"Database connection error: {e}")
         raise HTTPException(status_code=500, detail="Database connection error")
 
@@ -59,44 +49,20 @@ def create_table2():
     cursor.execute("""CREATE TABLE IF NOT EXISTS meetings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             organizer TEXT,
-<<<<<<< HEAD
             name TEXT,
-=======
-            name TEXT UNIQUE,
->>>>>>> 25a7876cf225a7d44148e336ac6c9a643c5f3993
             members TEXT,
             datetime DATETIME        
         )""")
     close_connect(connect)
 
 
-<<<<<<< HEAD
 def validate_datetime_format(datetime_str: str, format_str: str = '%Y-%m-%dT%H:%M') -> bool:
-=======
-def get_cookie(request: Request, cursor):
-    session_token = request.cookies.get("session_token")
-    if not session_token:
-        raise HTTPException(status_code=401, detail="No session token provided")
-    cursor.execute(
-        'SELECT 1 FROM users WHERE session_token = ?',
-        (session_token,)
-    )
-    exists = cursor.fetchone() is not None
-    if not exists:
-        return HTTPException(status_code=401, detail="Invalid session token")
-    else:
-        return session_token
-
-
-def validate_datetime_format(datetime_str: str, format_str: str = '%Y-%m-%d %H:%M:%S') -> bool:
->>>>>>> 25a7876cf225a7d44148e336ac6c9a643c5f3993
     if datetime.strptime(datetime_str, format_str):
         return True
     else:
         return False
 
 
-<<<<<<< HEAD
 def meet_func(name, members, dt, cookie, request):
     cursor, conn = open_connect()
     if cookie is None:
@@ -108,18 +74,11 @@ def meet_func(name, members, dt, cookie, request):
         "src" : "create_meeting"
         }
         return templates.TemplateResponse("template_error.html", context)
-=======
-def meet_func(request: Request, name: str, members: str, dt: str, cursor):
-    cookie = get_cookie(request, cursor)
-    if cookie is None:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
->>>>>>> 25a7876cf225a7d44148e336ac6c9a643c5f3993
     cursor.execute(
         'SELECT * FROM users WHERE session_token = ?',
         (cookie,)
     )
     organizer = cursor.fetchone()
-<<<<<<< HEAD
     if not organizer:
         close_connect(conn)
         context = {
@@ -175,28 +134,10 @@ def meet_func(request: Request, name: str, members: str, dt: str, cursor):
         "src" : "create_meeting"
         }
         return templates.TemplateResponse("template_error.html", context)
-=======
-    organizer_n = organizer['username_db']
-    if not organizer:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    if not name:
-        name = f"{organizer_n}'s meeting {dt}"
-    if not dt:
-        raise HTTPException(status_code=400,detail="Datetime is required and must be in the format YYYY-MM-DD HH:MM:SS")
-    now = datetime.now()
-    if not validate_datetime_format(dt):
-        raise HTTPException(status_code=400, detail="Invalid datetime format, need YYYY-MM-DD HH:MM:SS")
-    dt = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
-    if now >= dt:
-        raise HTTPException(status_code=400, detail="Datetime must be in the future")
-    if not members:
-        raise HTTPException(status_code=400, detail="People should be in the meeting")
->>>>>>> 25a7876cf225a7d44148e336ac6c9a643c5f3993
     cursor.execute(
         "INSERT INTO meetings (organizer, name, members, datetime) VALUES (?, ?, ?, ?)",
         (organizer_n, name, members, dt)
     )
-<<<<<<< HEAD
     close_connect(conn)
     context = {
         "request": request,
@@ -204,10 +145,6 @@ def meet_func(request: Request, name: str, members: str, dt: str, cursor):
         "src" : "create_meeting"
     }
     return templates.TemplateResponse("template.html", context)
-=======
-    response = JSONResponse(content={"message": "Meeting created successfully"}, status_code=201)
-    return response
->>>>>>> 25a7876cf225a7d44148e336ac6c9a643c5f3993
 
 
 def user_exists(username: str, email: str, cursor) -> bool:
@@ -219,7 +156,6 @@ def user_exists(username: str, email: str, cursor) -> bool:
     return exists
 
 
-<<<<<<< HEAD
 def reg(username, password, email, request):
     if username is None:
         context = {
@@ -264,13 +200,6 @@ def reg(username, password, email, request):
             "src" : "registration"
         }
         return templates.TemplateResponse("template_error.html", context)
-=======
-def reg(username: str, password: str, email: str, cursor):
-    if not valid_email(email):
-        raise HTTPException(status_code=400, detail="Invalid email format")
-    if user_exists(username, email, cursor):
-        raise HTTPException(status_code=400, detail="Username or email already exists")
->>>>>>> 25a7876cf225a7d44148e336ac6c9a643c5f3993
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     set_user_online(username, cursor)
     create_session_token = generate_session_token(10)
@@ -278,7 +207,6 @@ def reg(username: str, password: str, email: str, cursor):
         "INSERT INTO users (username_db, password_db, email, session_token) VALUES (?, ?, ?, ?)",
         (username, hashed_password, email, create_session_token)
     )
-<<<<<<< HEAD
     close_connect(conn)
     context = {
         "request": request,
@@ -291,11 +219,6 @@ def reg(username: str, password: str, email: str, cursor):
         value=create_session_token,
         secure=True,
         httponly=True
-=======
-    response = JSONResponse(content=dict(message="Registration successful"))
-    response.set_cookie(
-        key="session_token", value=create_session_token, secure=True, httponly=True
->>>>>>> 25a7876cf225a7d44148e336ac6c9a643c5f3993
     )
     return response
 
@@ -307,7 +230,6 @@ def set_user_online(username: str, cursor):
     )
 
 
-<<<<<<< HEAD
 def set_user_offline(cookie: str, cursor):
     cursor.execute(
         "UPDATE users SET status = 'offline' WHERE session_token = ?",
@@ -318,14 +240,10 @@ def set_user_offline(cookie: str, cursor):
 def login_func(username, password, request):
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     cursor, connect = open_connect()
-=======
-def set_user_offline(username: str, cursor):
->>>>>>> 25a7876cf225a7d44148e336ac6c9a643c5f3993
     cursor.execute(
             'SELECT * FROM users WHERE (username_db = ? AND password_db = ?) OR (email = ? AND password_db = ?)',
             (username, hashed_password, username, hashed_password)
     )
-<<<<<<< HEAD
     user_row = cursor.fetchone()
     cursor.execute(
             'SELECT * FROM users WHERE username_db = ? AND status = ?',
@@ -417,5 +335,3 @@ def get_data_from_db():
     rows = cursor.fetchall()
     close_connect(conn)
     return rows
-=======
->>>>>>> 25a7876cf225a7d44148e336ac6c9a643c5f3993
