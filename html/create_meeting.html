@@ -5,28 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create meeting</title>
     <link href="{{ url_for('static', path='css/styles.css') }}" rel="stylesheet">
-    <style>
-
-    </style>
 </head>
 <body>
-    <div class="container">
+    <div class="rectangle">
         <h1>Create a meeting</h1>
         <form action="/create_meeting" method="post">
             <div class="input-container">
                 <input type="text" name="name" class="input-field" placeholder="Name">
             </div>
             <div class="input-container">
-                <input type="text" name="members" class="input-field" placeholder="Members">
+                <input type="text" id="inputField" name="members" class="input-field" placeholder="Members">
+                <button onclick="addToList()" id="myButton" class="addMembers" type="button">+</button>
             </div>
+            <ul id="participantList"></ul>
             <div class="input-container">
                 <input type="datetime-local" name="datetime" class="input-field" placeholder='DateTime in format "YYYY-MM-DD HH:MM AM/PM"'>
             </div>
-            <input type="hidden" name="id" value="create_meeting">
-            <button type="submit">Send</button>
-            <button type="reset">Reset</button>
-            <a href="http://127.0.0.1:8000">Menu</a>
+            <button class="button" type="submit">Send</button><br>
+            <button class="button" type="reset">Reset</button><br>
+            <a href="http://127.0.0.1:8000" class="button">Menu</a>
         </form>
     </div>
+    <script src="/static/js/index.js"></script>
 </body>
 </html>

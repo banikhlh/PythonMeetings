@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 import hashlib
 from common import valid_email, generate_session_token
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
@@ -72,7 +72,7 @@ def meet_func(name, members, dt, cookie, request):
         context = {
         "request": request,
         "data_num": "401",
-        "data" : "You're not logined",
+        "data" : "You're not logged",
         "src" : "create_meeting"
         }
         return templates.TemplateResponse("template_error.html", context)
@@ -212,8 +212,7 @@ def reg(username, password, email, request):
     close_connect(conn)
     context = {
         "request": request,
-        "data": "Login ",
-        "src" : "login"
+        "data": "Registration "
     }
     html_content = templates.TemplateResponse("template.html", context).body.decode('utf-8')
     response = HTMLResponse(content=html_content)
@@ -235,7 +234,7 @@ def set_user_online(username: str, cursor):
 
 def set_user_offline(cookie: str, cursor):
     cursor.execute(
-        "UPDATE users SET status = 'offline' WHERE sesson_token = ?",
+        "UPDATE users SET status = 'offline' WHERE session_token = ?",
         (cookie,)
     )
 
@@ -248,6 +247,20 @@ def login_func(username, password, request):
             (username, hashed_password, username, hashed_password)
     )
     user_row = cursor.fetchone()
+    cursor.execute(
+            'SELECT * FROM users WHERE username_db = ? AND status = ?',
+            (username, "online")
+    )
+    user_status = cursor.fetchone()
+    if user_status:
+        close_connect(connect)
+        context = {
+        "request": request,
+        "data_num": "401",
+        "data" : "You already logged",
+        "src" : ""
+        }
+        return templates.TemplateResponse("template_error.html", context)
     if user_row:
         set_user_online(username, cursor)
         create_session_token = generate_session_token(10)
@@ -281,13 +294,13 @@ def login_func(username, password, request):
         return templates.TemplateResponse("template_error.html", context)
 
 
-def logout_func(cookie, request):
+def logout_func(cookie, request, response):
     if cookie is None:
         context = {
         "request": request,
         "data_num": "401",
-        "data" : "You're not login",
-        "src" : None
+        "data" : "You're not logged",
+        "src" : ""
         }
         return templates.TemplateResponse("template_error.html", context)
     cursor, connect = open_connect()
@@ -298,21 +311,14 @@ def logout_func(cookie, request):
     user_row = cursor.fetchone()
     if user_row:
         set_user_offline(cookie, cursor)
-        create_session_token = generate_session_token(10)
         close_connect(connect)
         context = {
             "request": request,
-            "data": "Login ",
-            "src" : "logout"
+            "data": "Logout ",
+            "src" : ""
         }
         html_content = templates.TemplateResponse("template.html", context).body.decode('utf-8')
         response = HTMLResponse(content=html_content)
-        response.set_cookie(
-            key="session_token",
-            value=create_session_token,
-            secure=True,
-            httponly=True
-        )
         return response
     else:
         close_connect(connect)
@@ -320,7 +326,7 @@ def logout_func(cookie, request):
             "request": request,
             "data_num": "401",
             "data" : "Invalid credentials",
-            "src" : "logout"
+            "src" : ""
         }
         return templates.TemplateResponse("template_error.html", context)
     
