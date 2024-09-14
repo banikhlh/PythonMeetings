@@ -4,3 +4,4 @@ __pycache__
 .idea
 tools.py
 .vscode
+config.py

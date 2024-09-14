@@ -1,59 +1,11 @@
-from sqlite3 import Connection, Cursor, connect, Error, Row
-from fastapi import HTTPException
+from sqlite3 import connect
 import hashlib
 from common import valid_email, generate_session_token
 from datetime import datetime
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
 
 
-templates = Jinja2Templates(directory="templates", autoescape=False, auto_reload=True)
-
-
-def get_db_connection():
-    try:
-        conn = connect("DataBase.db")
-        conn.row_factory = Row
-        return conn
-    except Error as e:
-        print(f"Database connection error: {e}")
-        raise HTTPException(status_code=500, detail="Database connection error")
-
-
-def open_connect() -> (Cursor | Connection):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    return cursor, conn
-
-
-def close_connect(conn: Connection):
-    conn.commit()
-    conn.close()
-
-
-def create_table1():
-    cursor, connect = open_connect()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username_db TEXT UNIQUE,
-            password_db TEXT,
-            email TEXT UNIQUE,
-            session_token UNIQUE,
-            status TEXT CHECK (status IN ('online', 'offline')) DEFAULT 'online'
-        )""")
-    close_connect(connect)
-
-
-def create_table2():
-    cursor, connect = open_connect()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS meetings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            organizer TEXT,
-            name TEXT,
-            members TEXT,
-            datetime DATETIME        
-        )""")
-    close_connect(connect)
+def open_connect():
+   return connect('DataBase.db')
 
 
 def validate_datetime_format(datetime_str: str, format_str: str = '%Y-%m-%dT%H:%M') -> bool:
@@ -63,88 +15,58 @@ def validate_datetime_format(datetime_str: str, format_str: str = '%Y-%m-%dT%H:%
         return False
 
 
-def meet_func(name, members, dt, cookie, request):
-    cursor, conn = open_connect()
-    if cookie is None:
-        close_connect(conn)
-        context = {
-        "request": request,
-        "data_num": "401",
-        "data" : "You're not logged",
-        "src" : "create_meeting"
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    cursor.execute(
-        'SELECT * FROM users WHERE session_token = ?',
-        (cookie,)
-    )
-    organizer = cursor.fetchone()
-    if not organizer:
-        close_connect(conn)
-        context = {
-        "request": request,
-        "data_num": "401",
-        "data" : "Invalid credentials",
-        "src" : "create_meeting"
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    organizer_n = organizer[1]
-    if name is None:
-        name = f"{organizer_n}'s meeting {dt}"
-    cursor.execute(
-        'SELECT * FROM meetings WHERE name = ?',
-        (name,)
-    )
-    exists = cursor.fetchone()
-    if exists:
-        close_connect(conn)
-        context = {
-        "request": request,
-        "data_num": "400",
-        "data" : "Meeting name already exists",
-        "src" : "create_meeting"
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    if dt is None:
-        close_connect(conn)
-        context = {
-        "request": request,
-        "data_num": "400",
-        "data" : "DateTime cannot be empty",
-        "src" : "create_meeting"
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    now = datetime.now()
-    dt = datetime.strptime(dt, '%Y-%m-%dT%H:%M')
-    if now >= dt:
-        close_connect(conn)
-        context = {
-        "request": request,
-        "data_num": "400",
-        "data" : "Datetime must be in future",
-        "src" : "create_meeting"
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    if members is None:
-        close_connect(conn)
-        context = {
-        "request": request,
-        "data_num": "400",
-        "data" : "People should be in the meeting",
-        "src" : "create_meeting"
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    cursor.execute(
-        "INSERT INTO meetings (organizer, name, members, datetime) VALUES (?, ?, ?, ?)",
-        (organizer_n, name, members, dt)
-    )
-    close_connect(conn)
-    context = {
-        "request": request,
-        "data": "Create meeting ",
-        "src" : "create_meeting"
-    }
-    return templates.TemplateResponse("template.html", context)
+def create_meeting(name, members, dt, cookie):
+    with open_connect() as conn:
+        cursor = conn.cursor()
+        if cookie is None:
+            txt = "You aren't logged"
+            num = "401"
+            return txt, num
+        cursor.execute(
+            'SELECT * FROM users WHERE session_token = ?',
+            (cookie,)
+        )
+        conn.commit()
+        organizer = cursor.fetchone()
+        if not organizer:
+            txt = "Invalid credentials"
+            num = "401"
+            return txt, num
+        organizer_n = organizer[1]
+        if name is None:
+            name = f"{organizer_n}'s meeting {dt}"
+        cursor.execute(
+            'SELECT * FROM meetings WHERE name = ?',
+            (name,)
+        )
+        conn.commit()
+        exists = cursor.fetchone()
+        if exists:
+            txt = "Meeting name already exists"
+            num = "400"
+            return txt, num
+        if dt is None:
+            txt = "DateTime cannot be empty"
+            num = "400"
+            return txt, num
+        now = datetime.now()
+        dt = datetime.strptime(dt, '%Y-%m-%dT%H:%M')
+        if now >= dt:
+            txt = "DateTime must be in future"
+            num = "400"
+            return txt, num
+        if members is None:
+            txt = "People should be in the meeting"
+            num = "400"
+            return txt, num
+        cursor.execute(
+            "INSERT INTO meetings (organizer, name, members, datetime) VALUES (?, ?, ?, ?)",
+            (organizer_n, name, members, dt)
+        )
+        conn.commit()
+        txt = "Create meeting successful"
+        num = ""
+        return txt, num
 
 
 def user_exists(username: str, email: str, cursor) -> bool:
@@ -156,77 +78,47 @@ def user_exists(username: str, email: str, cursor) -> bool:
     return exists
 
 
-def reg(username, password, email, request):
-    if username is None:
-        context = {
-            "request": request,
-            "data_num": "400",
-            "data": "Username cannot be empty",
-            "src" : "registration"
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    if password is None:
-        context = {
-            "request": request,
-            "data_num": "400",
-            "data": "Password cannot be empty",
-            "src" : "registration"
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    if email is None:
-        context = {
-            "request": request,
-            "data_num": "400",
-            "data": "Email cannot be empty",
-            "src" : "registration"
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    cursor, conn = open_connect()
-    if not valid_email(email):
-        close_connect(conn)
-        context = {
-            "request": request,
-            "data_num": "400",
-            "data": "Invalid email format",
-            "src" : "registration"
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    if user_exists(username, email, cursor):
-        close_connect(conn)
-        context = {
-            "request": request,
-            "data_num": "400",
-            "data": "Username or email already exists",
-            "src" : "registration"
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
-    set_user_online(username, cursor)
-    create_session_token = generate_session_token(10)
-    cursor.execute(
-        "INSERT INTO users (username_db, password_db, email, session_token) VALUES (?, ?, ?, ?)",
-        (username, hashed_password, email, create_session_token)
-    )
-    close_connect(conn)
-    context = {
-        "request": request,
-        "data": "Registration "
-    }
-    html_content = templates.TemplateResponse("template.html", context).body.decode('utf-8')
-    response = HTMLResponse(content=html_content)
-    response.set_cookie(
-        key="session_token",
-        value=create_session_token,
-        secure=True,
-        httponly=True
-    )
-    return response
+def register(username, password, email, create_session_token: None):
+    with open_connect() as conn:
+        cursor = conn.cursor()
+        if username is None:
+            txt = "Username canot be empty"
+            num = "400"
+            return txt, num
+        if password is None:
+            txt = "Password cannot be empty"
+            num = "400"
+            return txt, num
+        if email is None:
+            txt = "Email cannot be empty"
+            num = "400"
+            return txt, num
+        if not valid_email(email):
+            txt = "Invalid email format"
+            num = "400"
+            return txt, num
+        if user_exists(username, email, cursor):
+            txt = "Username or email already exists"
+            num = "400"
+            return txt, num
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        set_user_online(username, cursor)
+        if create_session_token is None:
+            create_session_token = generate_session_token(10)
+        cursor.execute(
+            "INSERT INTO users (username_db, password_db, email, session_token) VALUES (?, ?, ?, ?)",
+            (username, hashed_password, email, create_session_token)
+        )
+        conn.commit()
+        txt = "Registration successful"
+        num = create_session_token
+        return txt, num
 
 
-def set_user_online(username: str, cursor):
+def set_user_online(username: None, cursor):
     cursor.execute(
-        "UPDATE users SET status = 'online' WHERE username_db = ?",
-        (username,)
+        "UPDATE users SET status = 'online' WHERE username_db = ? OR session_token = ?",
+        (username, username,)
     )
 
 
@@ -237,101 +129,80 @@ def set_user_offline(cookie: str, cursor):
     )
 
 
-def login_func(username, password, request):
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
-    cursor, connect = open_connect()
-    cursor.execute(
-            'SELECT * FROM users WHERE (username_db = ? AND password_db = ?) OR (email = ? AND password_db = ?)',
-            (username, hashed_password, username, hashed_password)
-    )
-    user_row = cursor.fetchone()
-    cursor.execute(
-            'SELECT * FROM users WHERE username_db = ? AND status = ?',
-            (username, "online")
-    )
-    user_status = cursor.fetchone()
-    if user_status:
-        close_connect(connect)
-        context = {
-        "request": request,
-        "data_num": "401",
-        "data" : "You already logged",
-        "src" : ""
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    if user_row:
-        set_user_online(username, cursor)
-        create_session_token = generate_session_token(10)
+def login(username, password, create_session_token: None):
+    with open_connect() as conn:
+        cursor = conn.cursor()
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
         cursor.execute(
-            "UPDATE users SET session_token = ? WHERE username_db = ?",
-            (create_session_token, username)
+                'SELECT * FROM users WHERE (username_db = ? AND password_db = ?) OR (email = ? AND password_db = ?)',
+                (username, hashed_password, username, hashed_password)
         )
-        close_connect(connect)
-        context = {
-            "request": request,
-            "data": "Login ",
-            "src" : "login"
-        }
-        html_content = templates.TemplateResponse("template.html", context).body.decode('utf-8')
-        response = HTMLResponse(content=html_content)
-        response.set_cookie(
-            key="session_token",
-            value=create_session_token,
-            secure=True,
-            httponly=True
-        )
-        return response
-    else:
-        close_connect(connect)
-        context = {
-        "request": request,
-        "data_num": "401",
-        "data" : "Invalid credentials",
-        "src" : "login"
-        }
-        return templates.TemplateResponse("template_error.html", context)
+        user_row = cursor.fetchone()
+        if user_row:
+            set_user_online(username, cursor)
+            if create_session_token is None:
+                create_session_token = generate_session_token(10)
+            cursor.execute(
+                "UPDATE users SET session_token = ? WHERE username_db = ?",
+                (create_session_token, username)
+            )
+            txt = "Login successful"
+            num = create_session_token
+            return txt, num
+        else:
+            txt = "Invalid credentials"
+            num = "401"
+            return txt, num
 
 
-def logout_func(cookie, request, response):
-    if cookie is None:
-        context = {
-        "request": request,
-        "data_num": "401",
-        "data" : "You're not logged",
-        "src" : ""
-        }
-        return templates.TemplateResponse("template_error.html", context)
-    cursor, connect = open_connect()
-    cursor.execute(
-        "SELECT * FROM users WHERE session_token = ? AND status = 'online'",
-        (cookie,)
-    )
-    user_row = cursor.fetchone()
-    if user_row:
-        set_user_offline(cookie, cursor)
-        close_connect(connect)
-        context = {
-            "request": request,
-            "data": "Logout ",
-            "src" : ""
-        }
-        html_content = templates.TemplateResponse("template.html", context).body.decode('utf-8')
-        response = HTMLResponse(content=html_content)
-        return response
-    else:
-        close_connect(connect)
-        context = {
-            "request": request,
-            "data_num": "401",
-            "data" : "Invalid credentials",
-            "src" : ""
-        }
-        return templates.TemplateResponse("template_error.html", context)
+def logout(cookie):
+    with open_connect() as conn:
+        cursor = conn.cursor()
+        if cookie is None:
+            txt = "You're not logged"
+            num = "401"
+            return txt, num
+        cursor.execute(
+            "SELECT * FROM users WHERE session_token = ? AND status = 'online'",
+            (cookie,)
+        )
+        user_row = cursor.fetchone()
+        if user_row:
+            set_user_offline(cookie, cursor)
+            txt = "Logout successful"
+            num = ""
+            return txt, num
+        else:
+            txt = "Invalid credentials"
+            num = "401"
     
 
 def get_data_from_db():
-    cursor, conn = open_connect()
-    cursor.execute("SELECT * FROM meetings")
-    rows = cursor.fetchall()
-    close_connect(conn)
-    return rows
+    with open_connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM meetings")
+        rows = cursor.fetchall()
+        return rows
+
+
+def online_offline(session_token):
+    with open_connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT * FROM users WHERE session_token = ?',
+            (session_token,)
+        )
+        on_off = cursor.fetchone()
+        if on_off is None:
+            return
+        on_off1 = on_off[5]
+        return on_off1
+
+
+def users_txt():
+    with open_connect() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users")
+        rows = cursor.fetchall()
+        text_output = "\n".join([", ".join(map(str, row)) for row in rows])
+        return text_output
