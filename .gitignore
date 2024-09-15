@@ -1,2 +1,7 @@
 .venv
 DataBase.db
+__pycache__
+.idea
+tools.py
+.vscode
+config.py

@@ -1,99 +1,50 @@
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from defs import open_connect
+from tg import bot
+from web import app
+import threading
 import uvicorn
-from defs import open_connect, close_connect, set_user_online, set_user_offline, create_table1, reg, meet_func, create_table2
-from common import generate_session_token
-import hashlib
 
 
-app = FastAPI()
+def create_table1(cursor):
+    cursor.execute("""CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username_db TEXT UNIQUE,
+            password_db TEXT,
+            email TEXT UNIQUE,
+            session_token UNIQUE,
+            status TEXT CHECK (status IN ('online', 'offline')) DEFAULT 'online'
+        )""")
 
 
-class User(BaseModel):
-    username: str
-    password: str
-
-
-class UserCreate(User):
-    email: str
-
-
-@app.post("/login")
-async def login(user: User):
-    hashed_password = hashlib.sha256(user.password.encode()).hexdigest()
-    cursor, connect = open_connect()
-    cursor.execute(
-            'SELECT * FROM users WHERE (username_db = ? AND password_db = ?) OR (email = ? AND password_db = ?)',
-            (user.username, hashed_password, user.username, hashed_password)
-    )
-    user_row = cursor.fetchone()
-    if user_row:
-        set_user_online(user.username, cursor)
-        session_token = generate_session_token(10)
-        cursor.execute(
-            "UPDATE users SET session_token = ? WHERE username_db = ?",
-            (session_token, user.username)
-        )
-        close_connect(connect)
-        response = JSONResponse(content=dict(message="Login successful"))
-        response.set_cookie(
-            key="session_token", value=session_token, secure=True, httponly=True
-        )
-        return response
-    else:
-        close_connect(connect)
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-
-@app.post("/logout")
-async def logout(user: User):
-    cursor, connect = open_connect()
-    cursor.execute(
-        "SELECT * FROM users WHERE username_db = ? AND status = 'online'",
-        (user.username,)
-    )
-    user_row = cursor.fetchone()
-    if user_row:
-        set_user_offline(user.username, cursor)
-        session_token = generate_session_token(10)
-        close_connect(connect)
-        response = JSONResponse(content={"message": "Logout successful"})
-        response.set_cookie(
-            key="session_token", value=session_token, secure=True, httponly=True
-        )
-        return response
-    else:
-        close_connect(connect)
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-
-@app.post("/register")
-async def register(user: UserCreate):
-    cursor, conn = open_connect()
-    reg(user.username, user.password, user.email, cursor)
-    close_connect(conn)
-    return JSONResponse(content={"message": "User registered successfully"})
-
-
-class Meet(BaseModel):
-    name: str
-    members: str
-    datetime: str
-
-
-@app.post("/create_meet")
-async def create_meet(meet: Meet, request: Request):
-    cursor, conn = open_connect()
-    meet_func(request, meet.name, meet.members, meet.datetime, cursor)
-    close_connect(conn)
+def create_table2(cursor):
+    cursor.execute("""CREATE TABLE IF NOT EXISTS meetings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organizer TEXT,
+            name TEXT,
+            members TEXT,
+            datetime DATETIME        
+        )""")
 
 
 def main():
-    create_table1()
-    create_table2()
+    with open_connect() as conn:
+        cursor = conn.cursor()
+        create_table1(cursor)
+        create_table2(cursor)
+        conn.commit()
 
+def start_fastapi():
+    uvicorn.run(app, host="127.0.0.1", port=8000)
+
+def start_bot():
+    bot.polling()
 
 if __name__ == "__main__":
-    main()
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    fastapi_thread = threading.Thread(target=start_fastapi)
+    bot_thread = threading.Thread(target=start_bot)
+
+    fastapi_thread.start()
+    bot_thread.start()
+
+    fastapi_thread.join()
+    bot_thread.join()

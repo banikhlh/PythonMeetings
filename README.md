@@ -1,3 +1,1 @@
-# pythonProject
 
-my first project

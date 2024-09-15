@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Meet and Greet</title>
+    <link href="{{ url_for('static', path='css/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+    <h1>Hub</h1>
+    <div class="rectangle">
+        {% if not status %}
+            <a href="http://127.0.0.1:8000/login" class="button">Login</a><br>
+            <a href="http://127.0.0.1:8000/registration" class="button">Registration</a><br>
+        {% else %}
+            <a href="http://127.0.0.1:8000/create_meeting" class="button">Create meeting</a><br>
+        {% endif %}
+        <a href="http://127.0.0.1:8000/meetings" class="button">Meetings</a><br>
+        {% if status %}
+        <form action="/logout" method="post">
+            <button class="button" type="submit" class="submit-button">Logout</button>
+        </form>
+        {% endif %}
+    </p>
+</body>
+</html>
