@@ -19,9 +19,9 @@ def create_meeting(name, members, dt, cookie):
     with open_connect() as conn:
         cursor = conn.cursor()
         if cookie is None:
-            txt = "You aren't logged"
-            num = "401"
-            return txt, num
+            text = "You aren't logged"
+            status_code = "401"
+            return text, status_code
         cursor.execute(
             'SELECT * FROM users WHERE session_token = ?',
             (cookie,)
@@ -29,9 +29,9 @@ def create_meeting(name, members, dt, cookie):
         conn.commit()
         organizer = cursor.fetchone()
         if not organizer:
-            txt = "Invalid credentials"
-            num = "401"
-            return txt, num
+            text = "Invalid credentials"
+            status_code = "401"
+            return text, status_code
         organizer_n = organizer[1]
         if name is None:
             name = f"{organizer_n}'s meeting {dt}"
@@ -42,31 +42,31 @@ def create_meeting(name, members, dt, cookie):
         conn.commit()
         exists = cursor.fetchone()
         if exists:
-            txt = "Meeting name already exists"
-            num = "400"
-            return txt, num
+            text = "Meeting name already exists"
+            status_code = "400"
+            return text, status_code
         if dt is None:
-            txt = "DateTime cannot be empty"
-            num = "400"
-            return txt, num
+            text = "DateTime cannot be empty"
+            status_code = "400"
+            return text, status_code
         now = datetime.now()
         dt = datetime.strptime(dt, '%Y-%m-%dT%H:%M')
         if now >= dt:
-            txt = "DateTime must be in future"
-            num = "400"
-            return txt, num
+            text = "DateTime must be in future"
+            status_code = "400"
+            return text, status_code
         if members is None:
-            txt = "People should be in the meeting"
-            num = "400"
-            return txt, num
+            text = "People should be in the meeting"
+            status_code = "400"
+            return text, status_code
         cursor.execute(
             "INSERT INTO meetings (organizer, name, members, datetime) VALUES (?, ?, ?, ?)",
             (organizer_n, name, members, dt)
         )
         conn.commit()
-        txt = "Create meeting successful"
-        num = ""
-        return txt, num
+        text = "Create meeting successful"
+        status_code = ""
+        return text, status_code
 
 
 def user_exists(username: str, email: str, cursor) -> bool:

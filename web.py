@@ -22,26 +22,26 @@ templates = Jinja2Templates(directory="templates", autoescape=False, auto_reload
 async def web_login(request: Request, 
     username: str = Form(None),
     password: str = Form(None)):
-    num = ""
-    txt, num = login(username, password)
-    if txt != "Login successful":
+    status_code = ""
+    text, status_code = login(username, password)
+    if text != "Login successful":
         context = {
             "request": request,
-            "data_num": num,
-            "data" : txt,
+            "data_num": status_code,
+            "data" : text,
             "src" : ""
         }
         return templates.TemplateResponse("template_error.html", context)
-    elif txt == "Login successful":
+    elif text == "Login successful":
         context = {
             "request": request,
-            "data": txt
+            "data": text
         }
         html_content = templates.TemplateResponse("template.html", context).body.decode('utf-8')
         response = HTMLResponse(content=html_content)
         response.set_cookie(
             key="session_token",
-            value=num,
+            value=status_code,
             secure=True,
             httponly=True
         )
