@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% if type == 'upd' %}
+    <title>Update meeting</title>
+    {% elif type == 'crt' %}
+    <title>Create meeting</title>
+    {% else %}
+    <title>ERROR</title>
+    {% endif %}
+    <link href="{{ url_for('static', path='css/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+    {% if type == 'upd' %}
+    <h1>Update meeting</h1>
+    <div class="rectangle">
+        <form action="/update_meeting" method="post">
+            <div class="input-container">
+                <input type="text" name="id_meeting" class="input-field" placeholder="Meeting's id">
+            </div>
+            <div class="input-container">
+                <input type="text" name="name" id="name" class="input-field" placeholder="New name">
+            </div>
+            <div class="input-container">
+                <input type="members" name="members" id="members" class="input-field" placeholder="New members">
+            </div>
+            <div class="input-container">
+                <input type="datetime-local" name="dt_start" id="dt_datetime" class="input-field" placeholder="New start datetime">
+            </div>
+            <div class="input-container">
+                <input type="datetime-local" name="dt_end" id="dt_datetime" class="input-field" placeholder="New end datetime">
+            </div>
+            <div class="input-container">
+                <input type="text" name="room" class="input-field" placeholder='Number of room'>
+            </div>
+            <button type="submit" class="button">Send</button><br>
+            <button type="reset" class="del-button">Reset</button><br>
+            <a href="http://127.0.0.1:8000" class="button">Menu</a>
+        </form>
+    </div>
+    {% elif type == 'crt' %}
+    <div class="rectangle">
+        <h1>Create a meeting</h1>
+        <form action="/create_meeting" method="post">
+            <div class="input-container">
+                <input type="text" name="name" class="input-field" placeholder="Name">
+            </div>
+            <div class="input-container">
+                <input type="text" id="inputField" name="members" class="input-field" placeholder="Members">
+            </div>
+            <ul id="participantList"></ul>
+            <div class="input-container">
+                <input type="datetime-local" name="dt_start" class="input-field" placeholder='Start DateTime in format "YYYY-MM-DD HH:MM"'>
+            </div>
+            <div class="input-container">
+                <input type="datetime-local" name="dt_end" class="input-field" placeholder='End DateTime in format "YYYY-MM-DD HH:MM"'>
+            </div>
+            <div class="input-container">
+                <input type="text" name="room" class="input-field" placeholder='Number of room'>
+            </div>
+            <button class="button" type="submit">Send</button><br>
+            <button class="del-button" type="reset">Reset</button><br>
+            <a href="http://127.0.0.1:8000" class="button">Menu</a>
+        </form>
+    </div>
+    {% else %}
+    <h1>ERROR</h1>
+    {% endif %}
+</body>
+</html>

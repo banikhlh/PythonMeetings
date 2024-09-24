@@ -15,11 +15,15 @@
             <a href="http://127.0.0.1:8000/create_meeting" class="button">Create meeting</a><br>
         {% endif %}
         <a href="http://127.0.0.1:8000/meetings" class="button">Meetings</a><br>
+        <a href="http://127.0.0.1:8000/admins" class="button">Admins</a><br>
+        <a href="http://127.0.0.1:8000/rooms" class="button">Rooms</a><br>
         {% if status %}
-        <form action="/logout" method="post">
-            <button class="button" type="submit" class="submit-button">Logout</button>
-        </form>
+        <a href="http://127.0.0.1:8000/my_meetings" class="button">My Meetings</a><br>
+        <a href="http://127.0.0.1:8000/profile" class="button">Profile</a><br>
         {% endif %}
-    </p>
+        {% if admin == 'yes' %}
+        <a href="http://127.0.0.1:8000/admin_panel" class="button">Admin tools</a><br>
+        {% endif %}
+    </div>
 </body>
 </html>

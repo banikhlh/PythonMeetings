@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin tools</title>
+    <link href="{{ url_for('static', path='css/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+    <h1>Admin tools</h1>
+    <div class="rectangle">
+        {% if id == 1 %}
+        <a href="http://127.0.0.1:8000/give_admin_root" class="button">Give admin root</a><br>
+        <a href="http://127.0.0.1:8000/take_admin_root" class="button">Take admin root</a><br>
+        {% endif %}
+        {% if not adm %}
+        <form action="/create_room" method="post">
+            <button type="submit" class="button">Create room</button><br>
+        </form>
+        <a href="http://127.0.0.1:8000/delete_room" class="button">Delete room</a><br>
+        <a href="http://127.0.0.1:8000/delete_user_adm" class="button">Delete user</a><br>
+        <a href="http://127.0.0.1:8000/delete_meeting_adm" class="button">Delete meeting</a><br>
+        {% endif %}
+        <a href="http://127.0.0.1:8000/" class="button">Menu</a><br>
+    </div>
+</body>
+</html>
