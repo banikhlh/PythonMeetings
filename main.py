@@ -1,4 +1,5 @@
-from defs import open_connect, check_database
+from defs import check_database
+from sqlite3_class import DataBase
 from tg import bot
 from web import app
 import threading
@@ -10,8 +11,8 @@ def start_background_task():
     task_thread.start()
 
 
-def create_table1(cursor):
-    cursor.execute("""CREATE TABLE IF NOT EXISTS users (
+def create_table1(db):
+    db.execute("""CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username_db TEXT UNIQUE,
             password_db TEXT,
@@ -22,8 +23,8 @@ def create_table1(cursor):
         )""")
 
 
-def create_table2(cursor):
-    cursor.execute("""CREATE TABLE IF NOT EXISTS meetings (
+def create_table2(db):
+    db.execute("""CREATE TABLE IF NOT EXISTS meetings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             organizer_id INTEGER,
             name TEXT,
@@ -36,19 +37,18 @@ def create_table2(cursor):
         )""")
     
 
-def create_table3(cursor):
-    cursor.execute("""CREATE TABLE IF NOT EXISTS rooms (
+def create_table3(db):
+    db.execute("""CREATE TABLE IF NOT EXISTS rooms (
             id INTEGER PRIMARY KEY AUTOINCREMENT
         )""")
 
 
 def main():
-    with open_connect() as conn:
-        cursor = conn.cursor()
-        create_table1(cursor)
-        create_table2(cursor)
-        create_table3(cursor)
-        conn.commit()
+    with DataBase() as db:
+        create_table1(db)
+        create_table2(db)
+        create_table3(db)
+
 
 def start_fastapi():
     uvicorn.run(app, host="127.0.0.1", port=8000)

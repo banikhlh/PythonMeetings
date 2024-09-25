@@ -1,7 +1,8 @@
 from fastapi import Request, Form, Cookie
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from defs import login, logout, user, profile, delete_user, meeting, delete_meeting, open_connect, get_data_from_db, get_my_data_from_db, give_admin_root, take_admin_root, get_admins, create_room, get_max_room_id, get_room_data_from_db, admin_check, delete_room
+from defs import login, logout, user, profile, delete_user, meeting, delete_meeting, get_data_from_db, get_my_data_from_db, give_admin_root, take_admin_root, get_admins, create_room, get_max_room_id, get_room_data_from_db, admin_check, delete_room
+from sqlite3_class import DataBase
 from starlette.templating import Jinja2Templates
 from starlette.requests import Request
 from fastapi import FastAPI
@@ -224,14 +225,10 @@ async def web_delete_meet(request: Request,
     password: str = Form(None),
     session_token = Cookie(None)
     ):
-    with open_connect() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT admin FROM users WHERE session_token = ?",
-            (session_token,)
-            )
-        adm = cursor.fetchone()[0]
+    with DataBase() as db:
+        adm = db.fetch_one("SELECT admin FROM users WHERE session_token = ?", (session_token,))
         status_code = ""
-        text, status_code = delete_room(id, password, session_token, adm)
+        text, status_code = delete_room(id, password, session_token, adm[0])
         if status_code != "":
             context = {
                 "request": request,
@@ -386,13 +383,8 @@ async def web_delete_user_adm(request: Request,
 @app.get("/", response_class=HTMLResponse)
 async def show_main_page(request: Request,
     session_token = Cookie(None)):
-    with open_connect() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            'SELECT id, admin FROM users WHERE session_token = ? AND status = ?',
-            (session_token, "online")
-        )
-        status = cursor.fetchone()
+    with DataBase() as db:
+        status = db.fetch_one('SELECT id, admin FROM users WHERE session_token = ? AND status = ?', (session_token, "online"))
         if status is None:
             context = {
                 "status": False,

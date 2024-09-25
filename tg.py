@@ -16,7 +16,7 @@ room_data = {}
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup = types.InlineKeyboardMarkup()
     
     btn1 = types.InlineKeyboardButton(text='Register', callback_data='register')
     btn2 = types.InlineKeyboardButton(text='Login', callback_data='login')
