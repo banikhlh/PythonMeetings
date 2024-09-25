@@ -1,14 +1,17 @@
-from sqlite3 import connect
 import hashlib
-from common import valid_email, generate_session_token
 from datetime import datetime
+from sqlite3 import connect
+
+from common import generate_session_token, valid_email
 
 
 def open_connect():
-   return connect('DataBase.db')
+    return connect("DataBase.db")
 
 
-def validate_datetime_format(datetime_str: str, format_str: str = '%Y-%m-%dT%H:%M') -> bool:
+def validate_datetime_format(
+    datetime_str: str, format_str: str = "%Y-%m-%dT%H:%M"
+) -> bool:
     if datetime.strptime(datetime_str, format_str):
         return True
     else:
@@ -22,10 +25,7 @@ def create_meeting(name, members, dt, cookie):
             text = "You aren't logged"
             status_code = "401"
             return text, status_code
-        cursor.execute(
-            'SELECT * FROM users WHERE session_token = ?',
-            (cookie,)
-        )
+        cursor.execute("SELECT * FROM users WHERE session_token = ?", (cookie,))
         conn.commit()
         organizer = cursor.fetchone()
         if not organizer:
@@ -35,10 +35,7 @@ def create_meeting(name, members, dt, cookie):
         organizer_n = organizer[1]
         if name is None:
             name = f"{organizer_n}'s meeting {dt}"
-        cursor.execute(
-            'SELECT * FROM meetings WHERE name = ?',
-            (name,)
-        )
+        cursor.execute("SELECT * FROM meetings WHERE name = ?", (name,))
         conn.commit()
         exists = cursor.fetchone()
         if exists:
@@ -50,7 +47,7 @@ def create_meeting(name, members, dt, cookie):
             status_code = "400"
             return text, status_code
         now = datetime.now()
-        dt = datetime.strptime(dt, '%Y-%m-%dT%H:%M')
+        dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M")
         if now >= dt:
             text = "DateTime must be in future"
             status_code = "400"
@@ -61,7 +58,7 @@ def create_meeting(name, members, dt, cookie):
             return text, status_code
         cursor.execute(
             "INSERT INTO meetings (organizer, name, members, datetime) VALUES (?, ?, ?, ?)",
-            (organizer_n, name, members, dt)
+            (organizer_n, name, members, dt),
         )
         conn.commit()
         text = "Create meeting successful"
@@ -71,8 +68,7 @@ def create_meeting(name, members, dt, cookie):
 
 def user_exists(username: str, email: str, cursor) -> bool:
     cursor.execute(
-        'SELECT 1 FROM users WHERE username_db = ? OR email = ?',
-        (username, email)
+        "SELECT 1 FROM users WHERE username_db = ? OR email = ?", (username, email)
     )
     exists = cursor.fetchone() is not None
     return exists
@@ -107,7 +103,7 @@ def register(username, password, email, create_session_token: None):
             create_session_token = generate_session_token(10)
         cursor.execute(
             "INSERT INTO users (username_db, password_db, email, session_token) VALUES (?, ?, ?, ?)",
-            (username, hashed_password, email, create_session_token)
+            (username, hashed_password, email, create_session_token),
         )
         conn.commit()
         txt = "Registration successful"
@@ -118,14 +114,16 @@ def register(username, password, email, create_session_token: None):
 def set_user_online(username: None, cursor):
     cursor.execute(
         "UPDATE users SET status = 'online' WHERE username_db = ? OR session_token = ?",
-        (username, username,)
+        (
+            username,
+            username,
+        ),
     )
 
 
 def set_user_offline(cookie: str, cursor):
     cursor.execute(
-        "UPDATE users SET status = 'offline' WHERE session_token = ?",
-        (cookie,)
+        "UPDATE users SET status = 'offline' WHERE session_token = ?", (cookie,)
     )
 
 
@@ -134,8 +132,8 @@ def login(username, password, create_session_token: None):
         cursor = conn.cursor()
         hashed_password = hashlib.sha256(password.encode()).hexdigest()
         cursor.execute(
-                'SELECT * FROM users WHERE (username_db = ? AND password_db = ?) OR (email = ? AND password_db = ?)',
-                (username, hashed_password, username, hashed_password)
+            "SELECT * FROM users WHERE (username_db = ? AND password_db = ?) OR (email = ? AND password_db = ?)",
+            (username, hashed_password, username, hashed_password),
         )
         user_row = cursor.fetchone()
         if user_row:
@@ -144,7 +142,7 @@ def login(username, password, create_session_token: None):
                 create_session_token = generate_session_token(10)
             cursor.execute(
                 "UPDATE users SET session_token = ? WHERE username_db = ?",
-                (create_session_token, username)
+                (create_session_token, username),
             )
             txt = "Login successful"
             num = create_session_token
@@ -164,7 +162,7 @@ def logout(cookie):
             return txt, num
         cursor.execute(
             "SELECT * FROM users WHERE session_token = ? AND status = 'online'",
-            (cookie,)
+            (cookie,),
         )
         user_row = cursor.fetchone()
         if user_row:
@@ -175,7 +173,7 @@ def logout(cookie):
         else:
             txt = "Invalid credentials"
             num = "401"
-    
+
 
 def get_data_from_db():
     with open_connect() as conn:
@@ -188,10 +186,7 @@ def get_data_from_db():
 def online_offline(session_token):
     with open_connect() as conn:
         cursor = conn.cursor()
-        cursor.execute(
-            'SELECT * FROM users WHERE session_token = ?',
-            (session_token,)
-        )
+        cursor.execute("SELECT * FROM users WHERE session_token = ?", (session_token,))
         on_off = cursor.fetchone()
         if on_off is None:
             return

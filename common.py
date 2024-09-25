@@ -1,9 +1,8 @@
 import random
-import string
 import re
+import string
 
-
-REGEX = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
+REGEX = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b"
 
 
 def generate_session_token(length: int) -> str:
