@@ -481,20 +481,12 @@ async def show_meetings_page(request: Request):
 @app.get("/my_meetings")
 async def show_my_meetings_page(request: Request,
     session_token = Cookie(None)):
-    with open_connect() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT * FROM users WHERE session_token = ?",
-            (session_token,)
-        )
-        user = cursor.fetchone()
-        user_id = user[0]
-        status = get_my_data_from_db(user_id)
-        context = {
-            "data": status,
-            "request": request
-        }
-        return html.TemplateResponse("my_meetings.html", context)
+    status = get_my_data_from_db(session_token)
+    context = {
+        "data": status,
+        "request": request
+    }
+    return html.TemplateResponse("my_meetings.html", context)
     
 
 @app.get("/create_meeting", response_class=HTMLResponse)

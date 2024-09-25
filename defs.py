@@ -76,7 +76,7 @@ def meeting(id_meeting: None, name, members, dt_start, dt_end, room, cookie, typ
             text = "DateTime cannot be empty"
             status_code = "400"
             return text, status_code
-        if validate_datetime_format(dt_start) or validate_datetime_format(dt_end):
+        if validate_datetime_format(dt_start, '%Y-%m-%dT%H:%M') or validate_datetime_format(dt_end, '%Y-%m-%dT%H:%M'):
             text = "Incorrect datetime format"
             status_code = "400"
             return text, status_code
@@ -334,7 +334,7 @@ def logout(cookie):
             status_code = "401"
             return text, status_code
         cursor.execute(
-            "SELECT * FROM users WHERE session_token = ? AND status = 'online'",
+            "SELECT * FROM users WHERE session_token = ?",
             (cookie,)
         )
         user_row = cursor.fetchone()
@@ -463,9 +463,11 @@ def get_room_data_from_db(room_id):
 
 
 
-def get_my_data_from_db(organizer_id):
+def get_my_data_from_db(cookie):
     with open_connect() as conn:
         cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE session_token = ?", (cookie,))
+        organizer_id = cursor.fetchone()[0]
         cursor.execute("""
             SELECT 
                 meetings.id, 
@@ -499,7 +501,6 @@ def check_datetime(start, end, room):
             (int(room),)
         )
         dt_meetings = cursor.fetchall()
-        print(dt_meetings)
         for start1, end1 in dt_meetings:
             start2 = datetime.strptime(start1, "%Y-%m-%d %H:%M:%S")
             end2 = datetime.strptime(end1, "%Y-%m-%d %H:%M:%S")
@@ -530,11 +531,13 @@ def check_database():
             result = cursor.fetchall()
             now = datetime.now()
             for id, dt in result:
+                dt = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
                 if dt <= now:
                     cursor.execute(
                     "DELETE FROM meetings WHERE id = ?",
                     (id,)
                     )
+                    print('DELETE MEETING')
                     conn.commit()
         time.sleep(300)
 
