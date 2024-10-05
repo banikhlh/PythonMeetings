@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="{{ url_for('static', path='css/styles.css') }}" rel="stylesheet">
+    <title>Rooms</title>
+</head>
+<body>
+    <h1>Rooms</h1>
+    <div id="rectangle">
+        {% for i in count %}
+            <form action="/room" method="POST" style="display:inline;">
+                <input type="hidden" name="room" value="{{ i }}">
+                <button type="submit" class="button">Room {{ i }}</button>
+            </form>
+        {% endfor %}
+    </div>
+</body>
+</html>
