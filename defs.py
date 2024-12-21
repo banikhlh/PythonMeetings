@@ -31,6 +31,8 @@ def create_room(cookie: None):
 
 def meeting(id_meeting: None, name, members, dt_start, dt_end, room, cookie, type):
     with DataBase() as db:
+        if "'" in name or '"' in name or "'" in members or '"' in members:
+            return "Invalid meeting name", "400"
         if cookie is None:
             return "You aren't logged", "401"
         if id_meeting == '' and type == 'upd':
@@ -116,6 +118,8 @@ def set_user_offline(cookie: str, db):
 
 def user(username, email, old_password: None, password, repeat_password, cookie: None, type):
     with DataBase() as db:
+        if '"' in username or '"' in email or "'" in password or "'" in password or "'" in username or "'" in email:
+            return "Invalid username or email", "400"
         if (cookie == '' or cookie is None) and type == 'upd':
             return "You're not logged", "401"
         if type == 'upd':
@@ -158,6 +162,8 @@ def user(username, email, old_password: None, password, repeat_password, cookie:
 
 def login(username, password, create_session_token: None):
     with DataBase() as db:
+        if '"' in username or "'" in password or "'" in username or '"' in password:
+            return "Invalid username or password", '400'
         hashed_password = hashlib.sha256(password.encode()).hexdigest()
         user_row = db.fetch_one('SELECT * FROM users WHERE (username_db = ? AND password_db = ?) OR (email = ? AND password_db = ?)', (username, hashed_password, username, hashed_password))
         if user_row:

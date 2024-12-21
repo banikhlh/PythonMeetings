@@ -15,8 +15,9 @@ def valid_email(email: str) -> bool:
     return re.fullmatch(REGEX, email) is not None
 
 
-def validate_datetime_format(datetime_str: str, format_str: str = '%Y-%m-%dT%H:%M') -> bool:
-    if datetime.strptime(datetime_str, format_str):
+def validate_datetime_format(datetime_str, format_str):
+    try:
+        datetime.strptime(datetime_str, format_str)
         return False
-    else:
+    except ValueError:
         return True
